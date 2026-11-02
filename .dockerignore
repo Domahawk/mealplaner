@@ -1,0 +1,10 @@
+vendor
+node_modules
+.git
+.env
+.env.*
+public/build
+public/hot
+storage/logs/*
+test-results
+playwright-report

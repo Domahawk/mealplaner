@@ -1,0 +1,146 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { flushPromises, mount, type VueWrapper } from '@vue/test-utils';
+import { createPinia, setActivePinia } from 'pinia';
+import { createMemoryHistory, createRouter } from 'vue-router';
+import App from '../../resources/js/App.vue';
+import { routes } from '../../resources/js/router';
+import { useThemeStore } from '../../resources/js/stores/theme';
+
+let wrapper: VueWrapper | undefined;
+
+async function mountApp() {
+    const pinia = createPinia();
+    setActivePinia(pinia);
+    const router = createRouter({ history: createMemoryHistory(), routes });
+    await router.push('/');
+    await router.isReady();
+    wrapper = mount(App, { global: { plugins: [pinia, router] } });
+    await flushPromises();
+    return { wrapper, router, pinia };
+}
+
+beforeEach(() => {
+    localStorage.clear();
+    document.documentElement.removeAttribute('data-theme');
+    vi.stubGlobal('fetch', vi.fn());
+});
+
+afterEach(() => {
+    wrapper?.unmount();
+    vi.unstubAllGlobals();
+});
+
+describe('starter application', () => {
+    it('mounts the welcome screen without issuing a network check', async () => {
+        const { wrapper } = await mountApp();
+        expect(wrapper.text()).toContain('Laravel + Vue 3 PWA Starter');
+        expect(wrapper.text()).toContain('Make it yours.');
+        expect(wrapper.text()).toContain('Not checked');
+        expect(fetch).not.toHaveBeenCalled();
+    });
+
+    it('navigates between Vue Router views', async () => {
+        const { wrapper, router } = await mountApp();
+        await wrapper.get('a[href="/about"]').trigger('click');
+        await flushPromises();
+        expect(router.currentRoute.value.path).toBe('/about');
+        expect(wrapper.text()).toContain('Your direction.');
+        await router.push('/missing');
+        await flushPromises();
+        expect(wrapper.text()).toContain('PAGE NOT FOUND');
+    });
+
+    it('switches and persists an explicit theme, then restores system preference', async () => {
+        const { wrapper } = await mountApp();
+        await wrapper.get('button[aria-label="Switch to dark theme"]').trigger('click');
+        expect(document.documentElement.dataset.theme).toBe('dark');
+        expect(localStorage.getItem('theme')).toBe('dark');
+        await wrapper.get('button[aria-label="Switch to light theme"]').trigger('click');
+        expect(document.documentElement.dataset.theme).toBe('light');
+        expect(localStorage.getItem('theme')).toBe('light');
+        await wrapper.get('.system-theme').trigger('click');
+        expect(localStorage.getItem('theme')).toBeNull();
+    });
+
+    it('uses a saved preference when the application reopens', async () => {
+        localStorage.setItem('theme', 'dark');
+        await mountApp();
+        expect(document.documentElement.dataset.theme).toBe('dark');
+    });
+
+    it('follows the system until an explicit preference is set', async () => {
+        vi.mocked(window.matchMedia).mockReturnValueOnce({
+            matches: true,
+            addEventListener: vi.fn(),
+            removeEventListener: vi.fn(),
+        } as unknown as MediaQueryList);
+        const { pinia } = await mountApp();
+        const theme = useThemeStore(pinia);
+        expect(theme.preference).toBe('system');
+        expect(theme.dark).toBe(true);
+    });
+
+    it('checks the same-origin API when requested and displays success', async () => {
+        vi.mocked(fetch).mockResolvedValue(
+            new Response(JSON.stringify({ status: 'ok', database: 'connected' })),
+        );
+        const { wrapper } = await mountApp();
+        await wrapper.get('.primary-button').trigger('click');
+        await flushPromises();
+        expect(fetch).toHaveBeenCalledWith(
+            '/api/health',
+            expect.objectContaining({ cache: 'no-store' }),
+        );
+        expect(wrapper.text()).toContain('All connected.');
+        expect(wrapper.get('.status-badge').text()).toBe('Connected');
+    });
+
+    it('shows loading state and prevents duplicate requests', async () => {
+        let resolve: ((value: Response) => void) | undefined;
+        vi.mocked(fetch).mockReturnValue(
+            new Promise<Response>((complete) => {
+                resolve = complete;
+            }),
+        );
+        const { wrapper } = await mountApp();
+        await wrapper.get('.primary-button').trigger('click');
+        expect(wrapper.get('.primary-button').attributes('disabled')).toBeDefined();
+        expect(wrapper.text()).toContain('Checking the API and database');
+        resolve?.(new Response(JSON.stringify({ status: 'ok', database: 'connected' })));
+        await flushPromises();
+        expect(fetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('handles a failed database response without exposing server details', async () => {
+        vi.mocked(fetch).mockResolvedValue(
+            new Response(JSON.stringify({ message: 'secret connection details' }), { status: 503 }),
+        );
+        const { wrapper } = await mountApp();
+        await wrapper.get('.primary-button').trigger('click');
+        await flushPromises();
+        expect(wrapper.text()).toContain('the database is unavailable');
+        expect(wrapper.text()).not.toContain('secret connection details');
+    });
+
+    it('handles network failure and supports retry', async () => {
+        vi.mocked(fetch).mockRejectedValueOnce(new TypeError('Failed to fetch'));
+        const { wrapper } = await mountApp();
+        await wrapper.get('.primary-button').trigger('click');
+        await flushPromises();
+        expect(wrapper.text()).toContain('Could not reach the server');
+        vi.mocked(fetch).mockResolvedValue(
+            new Response(JSON.stringify({ status: 'ok', database: 'connected' })),
+        );
+        await wrapper.get('.primary-button').trigger('click');
+        await flushPromises();
+        expect(wrapper.text()).toContain('All connected.');
+    });
+
+    it('rejects malformed success responses', async () => {
+        vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ status: 'unexpected' })));
+        const { wrapper } = await mountApp();
+        await wrapper.get('.primary-button').trigger('click');
+        await flushPromises();
+        expect(wrapper.text()).toContain('unexpected response');
+    });
+});

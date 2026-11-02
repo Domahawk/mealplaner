@@ -1,0 +1,12 @@
+vendor
+node_modules
+public/build
+storage
+bootstrap/cache
+composer.lock
+package-lock.json
+*.blade.php
+*.php
+phpunit.xml
+test-results
+playwright-report
