@@ -14,7 +14,7 @@ async function mountApp() {
     const router = createRouter({ history: createMemoryHistory(), routes });
     await router.push('/');
     await router.isReady();
-    wrapper = mount(App, { global: { plugins: [pinia, router] } });
+    wrapper = mount(App, { attachTo: document.body, global: { plugins: [pinia, router] } });
     await flushPromises();
     return { wrapper, router, pinia };
 }
@@ -30,11 +30,14 @@ afterEach(() => {
     vi.unstubAllGlobals();
 });
 
-describe('starter application', () => {
-    it('mounts the welcome screen without issuing a network check', async () => {
+describe('Mealplaner application', () => {
+    it('renders the Mealplaner home page without issuing a network check', async () => {
         const { wrapper } = await mountApp();
-        expect(wrapper.text()).toContain('Laravel + Vue 3 PWA Starter');
-        expect(wrapper.text()).toContain('Make it yours.');
+        expect(wrapper.get('.brand').text()).toBe('Mealplaner');
+        expect(wrapper.get('main h1').text()).toBe('Mealplaner');
+        expect(wrapper.text()).toContain('Your food, recipes, and nutrition in one place.');
+        expect(wrapper.text()).toContain('initial development stage');
+        expect(document.title).toBe('Mealplaner');
         expect(wrapper.text()).toContain('Not checked');
         expect(fetch).not.toHaveBeenCalled();
     });
@@ -44,10 +47,17 @@ describe('starter application', () => {
         await wrapper.get('a[href="/about"]').trigger('click');
         await flushPromises();
         expect(router.currentRoute.value.path).toBe('/about');
-        expect(wrapper.text()).toContain('Your direction.');
+        expect(wrapper.get('main h1').text()).toBe('About Mealplaner');
+        expect(document.title).toBe('About | Mealplaner');
+        expect(document.activeElement).toBe(wrapper.get('main').element);
         await router.push('/missing');
         await flushPromises();
-        expect(wrapper.text()).toContain('PAGE NOT FOUND');
+        expect(wrapper.get('main h1').text()).toBe('Page not found');
+        expect(document.title).toBe('Page not found | Mealplaner');
+        await wrapper.get('main .inline-link').trigger('click');
+        await flushPromises();
+        expect(router.currentRoute.value.path).toBe('/');
+        expect(document.title).toBe('Mealplaner');
     });
 
     it('switches and persists an explicit theme, then restores system preference', async () => {
@@ -70,10 +80,9 @@ describe('starter application', () => {
 
     it('follows the system until an explicit preference is set', async () => {
         vi.mocked(window.matchMedia).mockReturnValueOnce({
+            ...window.matchMedia('(prefers-color-scheme: dark)'),
             matches: true,
-            addEventListener: vi.fn(),
-            removeEventListener: vi.fn(),
-        } as unknown as MediaQueryList);
+        });
         const { pinia } = await mountApp();
         const theme = useThemeStore(pinia);
         expect(theme.preference).toBe('system');

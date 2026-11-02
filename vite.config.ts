@@ -61,7 +61,7 @@ ${css}
 
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, process.cwd(), '');
-    const name = env.VITE_APP_NAME || env.APP_NAME || 'My Application';
+    const name = env.VITE_APP_NAME || env.APP_NAME || 'Mealplaner';
     const port = Number(env.VITE_PORT || 5173);
     const host = env.VITE_HMR_HOST || 'localhost';
 
@@ -85,7 +85,7 @@ export default defineConfig(({ mode }) => {
                     id: '/',
                     name,
                     short_name: env.VITE_PWA_SHORT_NAME || name,
-                    description: 'Laravel + Vue 3 PWA Starter',
+                    description: 'Your food, recipes, and nutrition in one place.',
                     start_url: '/',
                     scope: '/',
                     display: 'standalone',

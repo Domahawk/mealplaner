@@ -15,7 +15,7 @@ test('Vue and CSS changes reach the browser through HMR without navigation', asy
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
     const before = navigations;
     try {
-        await writeFile(view, originalView.replace('Make it yours.', 'HMR is working.'));
+        await writeFile(view, originalView.replace('>Mealplaner</h1>', '>HMR is working.</h1>'));
         await expect(page.getByRole('heading', { level: 1 })).toContainText('HMR is working.');
         await writeFile(css, originalCss + '\n.hero { opacity: 0.81; }\n');
         await expect(page.locator('.hero')).toHaveCSS('opacity', '0.81');

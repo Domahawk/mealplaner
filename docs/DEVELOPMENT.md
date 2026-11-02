@@ -1,5 +1,56 @@
 # Development
 
+## Integrated frontend foundation
+
+The browser application lives in `resources/js`, bootstrapped by `app.ts` and mounted
+into the Blade entry `resources/views/app.blade.php`. `App.vue` supplies the Mealplaner
+header, skip link, main router outlet, existing theme controls, and PWA update notice.
+`resources/css/app.css` supplies the reused responsive light/dark styling.
+
+Vue Router keeps HTML5 history and the existing `/`, `/about`, and Not Found routes.
+The `/` route keeps its `welcome` name for compatibility. Route metadata provides
+page titles; navigation moves keyboard focus to the main region. Pinia is registered
+once in the existing entry and holds only the real `theme` and `connection` stores.
+No authentication pages or guards are currently implemented.
+
+The verified frontend versions are Vue 3.5.44, Vite 7.3.7, TypeScript 5.8.3, Vue Router
+4.6.4, Pinia 3.0.4, and Laravel's Vite plugin 2.1.0. Verification used the existing
+Node.js 24.22.2/npm 11.19.1 container and the preserved root lockfile.
+
+Use these root scripts through `docker compose exec -T --user node frontend` when
+host dependencies are hidden by Compose volumes:
+
+| Command                | Purpose                                                                                                     |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `npm ci`               | Reinstall exactly the locked dependencies when installation is needed; does not create another application. |
+| `npm run dev`          | Existing Vite process, serving development modules and HMR for Laravel.                                     |
+| `npm run type-check`   | Strict Vue TSC checking of application, tests, and tool configuration.                                      |
+| `npm run test:unit`    | Alias for the existing Vitest `npm run test`; runs once without backend services.                           |
+| `npm run lint`         | Existing non-mutating ESLint check.                                                                         |
+| `npm run format:check` | Existing non-mutating Prettier check.                                                                       |
+| `npm run build`        | Type checks, then emits production assets under `public/build`.                                             |
+| `npm run verify:build` | Checks the compiled entry, CSS, manifest, worker, offline shell, and icons.                                 |
+
+Unit tests remain in `tests/frontend` and use Vue Test Utils, memory routing, fresh
+Pinia, typed browser fixtures, and mocked HTTP responses. Browser tests remain under
+`tests/e2e`. The development suite verifies real assets, routing/refresh, connectivity,
+and Vue/CSS HMR. It temporarily edits the Home template and CSS and restores both;
+do not run it while someone else is editing those files.
+
+No `VITE_API_BASE_URL` is required: the existing API helper uses relative `/api/ready`.
+Public `VITE_APP_NAME`/`VITE_PWA_SHORT_NAME` control generated PWA/offline metadata;
+they do not override the product's Mealplaner header and route titles. The new example
+short name is Mealplaner; actual local overrides are preserved. Existing `APP_URL`,
+`VITE_HMR_HOST`, and port variables still control local asset/HMR origins. Restart
+Vite after changing environment settings and rebuild for production metadata changes.
+Never put credentials or private tokens into `VITE_*`; their values are public.
+
+TASK-03 verified browser rendering at 1440, 768, 390, and 320 pixels, keyboard access,
+light/dark themes, direct navigation/refresh, and backend endpoint isolation. The
+production-offline browser branch was not run in development mode. See
+[VERIFICATION.md](VERIFICATION.md) for results, the temporary host-Chrome testing
+method, and existing dependency advisories. No additional dependencies were introduced.
+
 ## Containers
 
 | Service  | Responsibility                 | Host ports     | Persistent data         |
@@ -23,7 +74,7 @@ docker compose exec --user node frontend npm run lint
 docker compose exec --user node frontend npm run format
 docker compose exec --user node frontend npm run format:check
 docker compose exec --user node frontend npm run type-check
-docker compose exec --user node frontend npm run test
+docker compose exec --user node frontend npm run test:unit
 docker compose exec backend php artisan test
 docker compose exec backend ./vendor/bin/pint --test
 docker compose exec backend ./vendor/bin/pint
@@ -52,7 +103,7 @@ No migrations run automatically. The starter includes only Laravel's cache/cache
 
 PHPUnit forces `APP_ENV=testing`, `DB_CONNECTION=sqlite`, `DB_DATABASE=:memory:`, and array cache/session drivers. It does not use refresh/reset operations on the development database. Run tests without a production config cache; use `php artisan config:clear` locally if you previously cached configuration.
 
-The integration script creates a unique `starter_test_<timestamp>_<pid>` database, runs migrations and the actual health controller against PostgreSQL, writes a probe row, recreates only the PostgreSQL container, and checks the row survived. It drops only the database it successfully created. Existing development databases are not migrated or removed.
+The integration script creates a unique `starter_test_<timestamp>_<pid>` database, runs migrations and the actual readiness controller against PostgreSQL, writes a probe row, recreates only the PostgreSQL container, and checks the row survived. It drops only the database it successfully created. Existing development databases are not migrated or removed.
 
 ## Browser integration checks
 

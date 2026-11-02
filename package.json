@@ -13,6 +13,7 @@
         "format:check": "prettier --check .",
         "type-check": "vue-tsc --noEmit",
         "test": "vitest run",
+        "test:unit": "npm run test",
         "test:watch": "vitest",
         "test:e2e": "playwright test",
         "verify:build": "node scripts/verify-build.mjs"

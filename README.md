@@ -11,11 +11,11 @@ Node/Vite provide development assets and build the frontend bundle.
 
 ## Current capabilities and MVP scope
 
-Implemented starter capabilities include welcome/about/not-found views, Vue Router
-navigation, Pinia-backed light/dark/system preferences, a user-triggered API/database
-connection check, Laravel liveness, and production PWA build support with an offline
-shell and prompted updates. Welcome/PWA copy still contains starter branding; the
-backend application-name default and environment example now use `Mealplaner`.
+The integrated frontend now displays the Mealplaner header, Home welcome message,
+About page, and Not Found page using the existing responsive styling. Route-specific
+titles, a skip link, and main-content focus after navigation support keyboard use.
+Existing Pinia-backed light/dark/system preferences, the user-triggered API/database
+connection check, Laravel liveness, and production PWA build/update support are preserved.
 No Inertia, Livewire, or authentication package is installed.
 
 Planned MVP capabilities, **not yet implemented**:
@@ -80,6 +80,33 @@ AGENTS.md                  Mandatory instructions for future Codex work
 There are no separate backend/frontend application directories. Compose's `backend`
 and `frontend` service names identify PHP and Vite processes for this same application.
 
+## Integrated frontend
+
+Laravel serves `resources/views/app.blade.php`, whose `@vite` directive loads
+`resources/js/app.ts`. That entry imports `resources/css/app.css`, registers the
+existing Pinia instance and Vue Router, and mounts `App.vue` into `#app`.
+There is one root package manifest, lockfile, Vite configuration, and deployment.
+
+The existing HTML5-history routes are preserved: `/` (`welcome` route name), `/about`,
+and the Not Found catch-all. Their titles are `Mealplaner`, `About | Mealplaner`, and
+`Page not found | Mealplaner`. Laravel continues handling API, health, storage, and
+worker namespaces separately. The two real shared stores remain `theme` and
+`connection`; no demo/global stores or authentication guards were added.
+
+TypeScript remains strict, with Vue TSC checking application components, tests, and
+tool configuration. Vitest and Vue Test Utils live under `tests/frontend`; Playwright
+checks live under `tests/e2e`. `npm run test:unit` now aliases the existing `npm run test`
+command, preserving both names.
+
+Requests continue using relative `/api/ready`; no `VITE_API_BASE_URL` or new API client
+is needed. Existing public `VITE_APP_NAME` and `VITE_PWA_SHORT_NAME` control build-time
+PWA/offline metadata. The product header and route titles display Mealplaner. Local
+metadata overrides are preserved; no actual environment file was overwritten.
+All `VITE_*` values are public: never put credentials or private tokens there.
+
+See [DEVELOPMENT.md](docs/DEVELOPMENT.md) for commands, HMR configuration, production
+builds, and frontend testing conventions.
+
 ## Local setup and development
 
 The existing setup uses Docker Engine with Compose v2, Git, and default loopback
@@ -139,17 +166,19 @@ docker compose exec -T --user app backend ./vendor/bin/phpstan analyse --no-prog
 docker compose exec -T --user node frontend npm run type-check
 docker compose exec -T --user node frontend npm run lint
 docker compose exec -T --user node frontend npm run format:check
-docker compose exec -T --user node frontend npm run test
+docker compose exec -T --user node frontend npm run test:unit
 docker compose exec -T --user node frontend npm run build
 docker compose exec -T --user node frontend npm run verify:build
 ```
 
-TASK-02 verification passes: **15 backend tests / 76 assertions**, **10 frontend
-tests**, Pint, PHPStan, type checking, lint/format checks, production build/artifact
-verification, Composer checks, and live HTTP health/readiness/SPA requests. The two
-backend test-contract mismatches and two formatting issues found by TASK-01 are fixed.
-The public health test also passes with an unconfigured database connection. See
-[VERIFICATION.md](docs/VERIFICATION.md) for current results and the historical baseline.
+TASK-03 verification passes: lockfile installation with `npm ci`, **10 frontend
+tests**, strict type checking, ESLint, Prettier, production build/artifact verification,
+and **3 development browser tests**, including real Vue/CSS HMR without reloading.
+One production-offline browser test was skipped in development mode. Chrome also
+verified keyboard navigation, titles, direct-route refresh, theme switching, and
+responsive layouts at 1440, 768, 390, and 320 pixels. All **15 backend tests / 76
+assertions** and Pint still pass; API health/readiness and Laravel routes remain intact.
+See [VERIFICATION.md](docs/VERIFICATION.md) for results and remaining dependency advisories.
 
 PHPUnit forces an isolated in-memory SQLite connection and array drivers. Never reset
 the development database or run migrations as an incidental verification step.
@@ -157,8 +186,9 @@ The existing connection-check UI now calls `/api/ready`; `/api/health` deliberat
 does not report database availability. PostgreSQL settings and the running service
 remain unchanged. Domain schema, migrations, and persistence/recovery validation
 belong to later tasks. The separate PostgreSQL probe creates/drops a test database
-and recreates its service; it was updated to use readiness but not executed. Browser,
-HMR, and offline behavior were not rerun for this backend stabilization task.
+and recreates its service; it was not executed. Development browser/HMR checks
+passed in TASK-03; production offline/update/device-installation behavior remains
+separate verification work.
 
 `npm run dev` starts Vite; `npm run format` modifies files and should be used only
 within the intended change scope. `npm run test:e2e` requires deliberate browser/runtime
@@ -179,6 +209,8 @@ setup, and its HMR test temporarily edits source. Do not remove database volumes
 - [Template reuse guide](docs/NEW_PROJECT.md): reference for creating a different
   project from the starter; do not use it to scaffold another application here.
 
-Next steps are the scoped branding, authentication, and domain features within this
-integrated application. No database schema change, CI workflow, cloud deployment,
-or application restructuring was introduced by backend stabilization.
+Next steps are authentication and domain features within this integrated application,
+plus deliberate dependency/security maintenance. The locked dependency audit reports
+26 low/moderate development-graph findings; the production-only audit reports zero.
+No forced upgrades, database schema changes, CI workflows, cloud deployments, or
+application restructuring were introduced by frontend integration.

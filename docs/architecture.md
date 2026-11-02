@@ -9,6 +9,8 @@ It matches the required architecture; no architectural replacement or restructur
 is needed. There are no `backend/` or `frontend/` application directories. TASK-02
 subsequently stabilized database-independent health, preserved database readiness, and
 resolved the audit's test/formatting failures without changing this architecture.
+TASK-03 reuses the same Vue/Vite foundation, adds Mealplaner content and accessible
+route titles/focus, and verifies the existing development browser/HMR workflow.
 
 The current interface is a reusable starter. Mealplaner's **MVP v0.1.0** domain features
 are planned: registration/login/logout; user-owned nutritional products; recipes and
@@ -77,7 +79,8 @@ mealplaner/
 ```
 
 Laravel serves `resources/views/app.blade.php`, which creates `#app`, supplies public
-application-name metadata, and calls `@vite('resources/js/app.ts')`. The TypeScript entry
+application-name metadata, uses a Mealplaner document title/description, and calls
+`@vite('resources/js/app.ts')`. The TypeScript entry
 imports CSS, creates Vue, registers Pinia and Vue Router, and mounts `App.vue`.
 `vite.config.ts` uses `laravel-vite-plugin` and `@vitejs/plugin-vue`; it does not define
 a second application. Vue components with logic use Composition API and typed script setup.
@@ -108,7 +111,8 @@ flowchart LR
 - **Laravel:** HTML entry delivery, web/API boundaries, JSON exception responses,
   liveness and database connectivity endpoints. Future validation, authentication,
   authorization, nutrition calculations, and persistence belong here.
-- **Vue:** starter welcome/about/not-found screens, navigation, responsive presentation,
+- **Vue:** Mealplaner Home/about/not-found screens, route titles and keyboard focus,
+  navigation, responsive presentation,
   loading/error/success connectivity states, theme preference, and PWA update notice.
   Future user workflows extend these existing components and conventions.
 - **Pinia:** existing `theme` and `connection` stores support real shared state.
@@ -138,8 +142,10 @@ exceptions use JSON rendering. The existing route listing contains seven entries
 | `GET /storage/{path}` | Laravel-generated signed local-file route because the local disk has `serve: true`.                                                                                              |
 | `PUT /storage/{path}` | Laravel-generated signed local-file upload route from the same disk configuration.                                                                                               |
 
-The browser router uses HTML5 history, with `/` (welcome), `/about`, and a catch-all
-Not Found view. Laravel must serve the SPA entry for client deep links while retaining
+The browser router uses HTML5 history, with `/` (Home; existing `welcome` route
+name), `/about`, and a catch-all Not Found view. Typed route metadata supplies page
+titles; the root shell updates the document title and focuses the main region after
+client navigation. A keyboard-visible skip link targets that same region. Laravel must serve the SPA entry for client deep links while retaining
 JSON API errors and separate static/framework handling. New server namespaces must
 be excluded from both the Laravel SPA fallback and the Workbox navigation fallback.
 There are no authentication guards or protected domain routes.
@@ -175,7 +181,11 @@ inputs; credentials and application keys must stay private. TASK-02 sets the
 application-name example/fallback to `Mealplaner` and preserves existing local
 overrides, including the current public spelling `MealPlaner`. Logging remains the
 existing stack/single-file configuration. Browser-visible names/URLs
-and Docker-internal database/service names have different consumers.
+and Docker-internal database/service names have different consumers. Frontend
+API calls remain relative, so no `VITE_API_BASE_URL` is needed. Existing public
+`VITE_APP_NAME`/`VITE_PWA_SHORT_NAME` customize PWA/offline build metadata; the
+product header and route document titles display Mealplaner. No new environment
+variables or client abstractions were introduced.
 
 Some Laravel configuration fallback values remain `database` for sessions/cache/queues,
 while the example explicitly selects `file`/`file`/`sync`. Maintain those environment
@@ -194,11 +204,16 @@ shared storage rather than assuming current file sessions are sufficient.
   No cached application configuration was present during the audit.
 - Vitest uses JSDOM and Vue Test Utils with real route definitions, fresh Pinia,
   memory history, a matchMedia stub, and mocked HTTP responses. Ten tests cover
-  startup without requests, routing, theme behavior, loading, connectivity, retries,
-  and invalid responses.
+  Mealplaner title/welcome/development notice, startup without requests, routing,
+  document titles/main focus, theme behavior, loading, connectivity, retries, and
+  invalid responses. The `matchMedia` fixture now implements its complete typed
+  interface instead of asserting through `unknown`.
 - Playwright tests exist for live HTTP/browser integration, development asset loading,
   production offline behavior, and HMR. The HMR test temporarily rewrites Vue/CSS
-  files. Browser tests were inspected but not executed in this source-preserving audit.
+  files and restores them in `finally`. TASK-03 ran the three development browser
+  checks successfully with installed Chrome; the production-offline check was
+  skipped in development mode. Additional browser checks covered keyboard use,
+  themes, and desktop/tablet/mobile layout without altering backend routes.
 - Pint uses the Laravel preset. PHPStan/Larastan analyzes `app`, bootstrap, and routes
   at level 8. ESLint, Prettier, strict Vue TSC, and a type-checked Vite build are configured.
 - `scripts/verify-build.mjs` verifies emitted assets, offline shell, root-absolute
@@ -207,9 +222,10 @@ shared storage rather than assuming current file sessions are sufficient.
   writes there, and recreates the PostgreSQL container. It was not executed: those
   operations are outside this audit's non-destructive scope.
 
-TASK-02 verification passes: 15 backend tests with 76 assertions, 10 frontend
-tests, Pint, PHPStan, frontend checks/build, and live health/readiness/SPA requests.
-The audit's two test-contract mismatches and two Pint issues are resolved. See the
+TASK-03 verification passes: 15 backend tests with 76 assertions, 10 frontend
+tests, Pint, strict type/lint/format checks, production build/artifact checks, and
+development browser/HMR tests. PHPStan passed at TASK-02 and its configuration is
+unchanged. The audit's two test-contract mismatches and two Pint issues are resolved. See the
 commands, historical diagnoses, and host/container distinctions in
 [VERIFICATION.md](VERIFICATION.md).
 
@@ -263,11 +279,18 @@ Development Compose configuration is not the production deployment contract.
    this root application's PHP 8.5 requirement. Use the existing PHP 8.5 container.
    Both lockfiles already exist and match installed dependencies; the earlier
    verification record's missing-lockfile claims have been replaced by this audit.
-6. **Plan missing domain/auth work without scaffolding again.** Starter metadata
-   and welcome/PWA copy remain generic; the backend name default is `Mealplaner`. Branding, auth,
+6. **Plan missing domain/auth work without scaffolding again.** TASK-03 replaces
+   visible starter copy with Mealplaner content; existing local PWA metadata overrides
+   remain configurable. Authentication,
    ownership, domain schema, nutrition rules, CI, browser/PWA acceptance, and deployment
    remain scoped future work. `docs/NEW_PROJECT.md` is template-reuse reference, not
    an instruction to initialize another project inside Mealplaner.
+
+7. **Review locked development-tool advisories in scoped maintenance.** TASK-03
+   `npm ci` succeeded without lockfile/dependency changes. Audit reported 2 low and
+   24 moderate findings in the development graph, no high/critical findings, and
+   zero findings in the production-only audit. Suggested fixes include incompatible
+   tool downgrades; no forced updates or overrides were applied.
 
 No architecture conflict was found. Host environment differences and missing MVP
 capabilities remain documented limitations, not reasons to replace the starter.

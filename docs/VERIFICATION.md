@@ -1,5 +1,68 @@
 # Verification record
 
+## TASK-03 — integrated Vue frontend (2026-11-02)
+
+The existing root Vue/Laravel integration, Router, Pinia, strict TypeScript, styling,
+unit/browser tools, and PWA behavior were reused. No application was scaffolded and
+no dependency versions changed. `package-lock.json` is unchanged. Root `npm ci`
+succeeded in the existing Node.js 24.22.2/npm 11.19.1 container using that lockfile.
+Detected versions remain Vue 3.5.44, Vite 7.3.7, TypeScript 5.8.3, Router 4.6.4,
+Pinia 3.0.4, Vue TSC 3.3.14, Laravel Vite plugin 2.1.0, and Vitest 4.1.12.
+
+The shell/Home now show Mealplaner and the requested welcome message. Existing About
+and Not Found routes remain available. Page titles, a skip link, main focus on route
+changes, and improved light-theme muted-text contrast were added; template-only
+components remain template-only. Theme/connection stores and API behavior are unchanged.
+`test:unit` aliases `test`, preserving existing callers.
+
+| Check                                   | Result                                                                                                                                           |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `npm ci`                                | Passed: 571 platform-applicable packages installed from the unchanged lockfile.                                                                  |
+| `npm run type-check`                    | Passed with all strict rules retained.                                                                                                           |
+| `npm run lint`                          | Passed without disabling rules.                                                                                                                  |
+| `npm run format:check`                  | Passed for the full repository after formatting the scoped source/documentation changes.                                                         |
+| `npm run test:unit`                     | Passed: 10 tests, including Home content, routes/titles/focus, existing theme and connection behavior.                                           |
+| `npm run build`                         | Passed: type check plus Vite 7.3.7; 45 modules compiled.                                                                                         |
+| `npm run verify:build`                  | Passed: static assets and existing PWA/offline artifacts; seven precache entries.                                                                |
+| Development Playwright suite            | Passed: 3 tests; 1 production-offline test skipped because `TEST_MODE=development`.                                                              |
+| Additional Chrome checks                | Passed: keyboard skip link/focus, title updates, no-reload navigation, nested unknown-route refresh, theme switching, and no runtime exceptions. |
+| Responsive checks and visual inspection | Passed: 1440, 768, 390, and 320 pixel widths with no horizontal overflow or clipped controls; light/dark and mobile screenshots inspected.       |
+| Backend smoke suite / Pint              | Passed: 15 tests, 76 assertions; 29 PHP files pass Pint.                                                                                         |
+
+The normal Laravel/Nginx origin `http://localhost:8000` served the app, with Vite assets
+and the actual HMR connection on port 5173. The existing browser tests verified Home,
+About navigation and refresh, nested Not Found content, readiness requests only on
+user action, development assets, no development service worker, and both Vue template
+and CSS HMR without a full navigation. The HMR fixture edits were restored in `finally`.
+No local environment or backend route changes were made.
+
+Host dependency directories expose no usable Node packages because they live in the
+container volume. For browser verification, the already-installed Playwright 1.64.1
+packages and existing test/config files were copied to a temporary host test workspace,
+with its resources path pointing to this checkout. Installed Google Chrome was used
+through `CHROMIUM_PATH=/usr/bin/google-chrome`; no browser/framework package was added
+or downloaded. An initial discovery error was resolved by preserving the root
+package's `type: module` metadata in that temporary workspace. Browser processes
+closed after checks. The production-offline branch was not executed, and production
+hosting/device installation remains unverified.
+
+Read-only HTTP checks returned 200 for `/api/health`, `/api/ready`, and `/up`;
+`/api/health` retained its exact `{"status":"ok"}` body. `/api/missing` returned JSON
+404 rather than the SPA. Backend business logic, routes, database settings, and all
+actual environment files remain unchanged. API URLs remain relative; no new API
+client or `VITE_API_BASE_URL` was introduced. Existing PWA name overrides remain public
+build metadata, while the header and page titles explicitly identify Mealplaner.
+
+`npm ci` reported **26 existing dependency-graph findings: 2 low and 24 moderate**,
+with no high or critical findings. Audit traced the originating advisories to
+`deepmerge`, `glob`, and `minimatch` in the development graph; **the production-only
+audit reported zero findings**. Suggested remediation includes incompatible tool
+changes/downgrades, so no forced fixes or dependency overrides were applied. npm also
+warned that locked ESLint/glob versions are deprecated and that an esbuild postinstall
+was not approved by its install-script policy. The installed platform binary worked:
+type checks, tests, and the production build all passed without relaxing that policy.
+Dependency/security maintenance remains follow-up work within its own scope.
+
 ## TASK-02 — Laravel backend stabilization (2026-11-02)
 
 The existing root Laravel application was extended without framework/dependency

@@ -10,7 +10,9 @@ test('Laravel serves the SPA and the browser calls the same-origin API on demand
     });
     const response = await page.goto('/');
     expect(response?.status()).toBe(200);
-    await expect(page.getByRole('heading', { level: 1 })).toContainText('A fresh start.');
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Mealplaner');
+    await expect(page.getByText('Your food, recipes, and nutrition in one place.')).toBeVisible();
+    await expect(page).toHaveTitle('Mealplaner');
     expect(checks).toBe(0);
     await page.getByRole('button', { name: 'Check server connection' }).click();
     await expect(page.getByRole('status').filter({ hasText: 'All connected.' })).toBeVisible();
@@ -18,7 +20,11 @@ test('Laravel serves the SPA and the browser calls the same-origin API on demand
     await page.getByRole('link', { name: 'About', exact: true }).click();
     await expect(page).toHaveURL(/\/about$/);
     await page.reload();
-    await expect(page.getByRole('heading', { level: 1 })).toContainText('Your direction.');
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('About Mealplaner');
+    await expect(page).toHaveTitle('About | Mealplaner');
+    await page.goto('/unknown/nested-page');
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Page not found');
+    await expect(page).toHaveTitle('Page not found | Mealplaner');
     const unknownApi = await request.get('/api/missing');
     expect(unknownApi.status()).toBe(404);
     expect(unknownApi.headers()['content-type']).toContain('application/json');
@@ -83,9 +89,9 @@ test('production PWA installs, precaches assets, and reopens a client route offl
 
     await context.setOffline(true);
     await page.goto('/about');
-    await expect(page.getByRole('heading', { level: 1 })).toContainText('Your direction.');
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('About Mealplaner');
     await page.goto('/');
-    await expect(page.getByRole('heading', { level: 1 })).toContainText('A fresh start.');
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Mealplaner');
     await page.getByRole('button', { name: 'Check server connection' }).click();
     await expect(
         page.getByRole('status').filter({ hasText: 'Could not reach the server' }),

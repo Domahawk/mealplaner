@@ -5,8 +5,8 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="application-name" content="{{ config('app.name') }}">
         <meta name="theme-color" content="#12332e">
-        <meta name="description" content="Laravel + Vue 3 PWA Starter">
-        <title>{{ config('app.name') }}</title>
+        <meta name="description" content="Your food, recipes, and nutrition in one place.">
+        <title>Mealplaner</title>
         <link rel="icon" type="image/png" href="/icons/icon-192.png">
         <link rel="apple-touch-icon" href="/icons/icon-192.png">
         @unless (Vite::isRunningHot())
