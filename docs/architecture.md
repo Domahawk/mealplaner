@@ -167,12 +167,15 @@ and referenced products/recipes will need ownership checks before those features
 ## Persistence and environment
 
 `config/database.php` defaults to PostgreSQL, with an explicitly separate in-memory
-SQLite connection for tests. Only a framework cache/cache-lock migration and an empty
-seeder are present. No migrations, resets, seeders, or database configuration changes
-were performed by the audit or TASK-02. A successful `/api/ready` probe confirms
-connectivity at verification time; it does not validate migrations, schema, backups,
-or persistent-volume recovery. `/api/health` remains operational when no database
-connection is configured.
+SQLite connection for default tests. Only a framework cache/cache-lock migration
+and an empty seeder are present; TASK-04 preserved both unchanged. Existing
+PostgreSQL 18.6 connectivity and `pdo_pgsql` were verified. Development has no user
+relations or migration repository and was deliberately left untouched because it
+was not confirmed newly created/dedicated. The migration passed in a fresh restricted
+PostgreSQL test database, including commit/reconnect persistence. No reset or
+PostgreSQL restart was used. Broader container recovery remains for TASK-05.
+`/api/health` remains operational without a database; `/api/ready` checks connectivity.
+See [database.md](database.md) for the full workflow and bounded verification results.
 
 Root `.env.example` currently documents local PostgreSQL, file sessions/cache,
 synchronous queues, log mail, application naming, and Vite/Compose settings. Real local
@@ -184,8 +187,10 @@ existing stack/single-file configuration. Browser-visible names/URLs
 and Docker-internal database/service names have different consumers. Frontend
 API calls remain relative, so no `VITE_API_BASE_URL` is needed. Existing public
 `VITE_APP_NAME`/`VITE_PWA_SHORT_NAME` customize PWA/offline build metadata; the
-product header and route document titles display Mealplaner. No new environment
-variables or client abstractions were introduced.
+product header and route document titles display Mealplaner. TASK-04 changed only
+nonsecret database examples/fallbacks to `mealplaner` and removed the sample password.
+Actual local environment values and frontend settings were preserved. No custom
+test-database variables or client abstractions were introduced.
 
 Some Laravel configuration fallback values remain `database` for sessions/cache/queues,
 while the example explicitly selects `file`/`file`/`sync`. Maintain those environment
@@ -201,7 +206,11 @@ shared storage rather than assuming current file sessions are sufficient.
   synthetic environment files. Runtime tests check required PHP extensions.
 - `phpunit.xml` forces testing mode, SQLite memory storage, an empty database URL,
   and array session/cache/mail drivers. No database refresh/reset traits are used.
-  No cached application configuration was present during the audit.
+  A shared bootstrap now rejects cached configuration, unsafe databases/URLs, and
+  inherited local settings before Laravel boots. The PostgreSQL suite additionally
+  checks the actual generated database, matching role, ownership, and restricted
+  permissions before running ordinary migrations. Test credentials are ephemeral
+  and separate from development; no test environment file is created.
 - Vitest uses JSDOM and Vue Test Utils with real route definitions, fresh Pinia,
   memory history, a matchMedia stub, and mocked HTTP responses. Ten tests cover
   Mealplaner title/welcome/development notice, startup without requests, routing,
@@ -218,16 +227,21 @@ shared storage rather than assuming current file sessions are sufficient.
   at level 8. ESLint, Prettier, strict Vue TSC, and a type-checked Vite build are configured.
 - `scripts/verify-build.mjs` verifies emitted assets, offline shell, root-absolute
   worker precache URLs, manifests, and PNG icons without a database.
-- `scripts/verify-postgres.sh` creates/drops an isolated database, runs migrations and
-  writes there, and recreates the PostgreSQL container. It was not executed: those
-  operations are outside this audit's non-destructive scope.
+- `scripts/verify-postgres.sh` now runs a restricted-role PostgreSQL suite in a
+  fresh per-run database, verifies migrations and a committed record across a new
+  connection, and removes only its own resources. The former container-recreation
+  step is removed. TASK-04 executed it successfully without modifying development
+  tables or restarting the existing service.
 
 TASK-03 verification passes: 15 backend tests with 76 assertions, 10 frontend
 tests, Pint, strict type/lint/format checks, production build/artifact checks, and
 development browser/HMR tests. PHPStan passed at TASK-02 and its configuration is
 unchanged. The audit's two test-contract mismatches and two Pint issues are resolved. See the
 commands, historical diagnoses, and host/container distinctions in
-[VERIFICATION.md](VERIFICATION.md).
+[VERIFICATION.md](VERIFICATION.md). TASK-04 subsequently passes 24 default tests
+(98 assertions), 3 PostgreSQL tests (49 assertions), all 10 frontend tests, Pint,
+and configured PHPStan analysis. Development relations remain unchanged and no
+generated test databases/roles remain after cleanup.
 
 ## Infrastructure and deployment
 

@@ -27,9 +27,11 @@ Planned MVP capabilities, **not yet implemented**:
 5. Record consumption by date.
 6. View daily calorie and macronutrient totals.
 
-There are no user/domain models or domain migrations yet. PostgreSQL connectivity
-works in the current development environment; schema, persistence recovery, and
-Mealplaner workflows have not been implemented or validated by this audit.
+There are no user/domain models or domain migrations yet. PostgreSQL 18.6
+connectivity, existing migration compatibility, and committed-record persistence
+across reconnects are verified in an isolated test database. Development migration
+history remains uninitialized and untouched. Broader Docker recovery and Mealplaner
+workflows remain separate work; see [database.md](docs/database.md).
 
 ## Detected stack
 
@@ -161,6 +163,7 @@ docker compose exec -T --user app backend php artisan route:list -v
 docker compose exec -T --user app backend composer validate --strict
 docker compose exec -T --user app backend composer check-platform-reqs
 docker compose exec -T --user app backend php artisan test
+sh scripts/verify-postgres.sh
 docker compose exec -T --user app backend ./vendor/bin/pint --test
 docker compose exec -T --user app backend ./vendor/bin/phpstan analyse --no-progress
 docker compose exec -T --user node frontend npm run type-check
@@ -180,14 +183,23 @@ responsive layouts at 1440, 768, 390, and 320 pixels. All **15 backend tests / 7
 assertions** and Pint still pass; API health/readiness and Laravel routes remain intact.
 See [VERIFICATION.md](docs/VERIFICATION.md) for results and remaining dependency advisories.
 
-PHPUnit forces an isolated in-memory SQLite connection and array drivers. Never reset
-the development database or run migrations as an incidental verification step.
-The existing connection-check UI now calls `/api/ready`; `/api/health` deliberately
-does not report database availability. PostgreSQL settings and the running service
-remain unchanged. Domain schema, migrations, and persistence/recovery validation
-belong to later tasks. The separate PostgreSQL probe creates/drops a test database
-and recreates its service; it was not executed. Development browser/HMR checks
-passed in TASK-03; production offline/update/device-installation behavior remains
+TASK-04 adds **24 default tests / 98 assertions** and **3 PostgreSQL tests / 49
+assertions**, all passing. Default tests use guarded SQLite memory storage; the
+PostgreSQL runner provisions a fresh database and restricted login, verifies existing
+migrations and commit/reconnect persistence, and removes only those test resources.
+It no longer recreates PostgreSQL. `pdo_pgsql` is required and available.
+
+The existing development database and local environment remain unchanged. Its
+`migrate:status` reports no migration repository; initialization was not authorized
+merely because it has no tables. `.env.example` now uses nonsecret Mealplaner database
+placeholders with a blank password. Keep `DB_HOST=postgres` inside the existing Compose
+network; use `127.0.0.1` only for an appropriate host-reachable database. The current
+container does not publish a database port. See [database.md](docs/database.md) for
+variables, permissions, safe migrations, isolation, and persistence limits.
+
+`/api/ready` remains the database probe; `/api/health` is database-independent.
+Docker restart/recreation recovery remains for TASK-05. Development browser/HMR
+checks passed in TASK-03; production offline/update/device installation remains
 separate verification work.
 
 `npm run dev` starts Vite; `npm run format` modifies files and should be used only
@@ -201,6 +213,8 @@ setup, and its HMR test temporarily edits source. Do not remove database volumes
   infrastructure, detected versions, decisions, and technical debt.
 - [Verification record](docs/VERIFICATION.md): current stabilization results and the
   historical architecture-audit baseline.
+- [Database guide](docs/database.md): PostgreSQL requirements, safe migration workflow,
+  restricted integration testing, reconnect persistence, and TASK-05 limits.
 - [Development guide](docs/DEVELOPMENT.md): containers, HMR, persistence, and existing
   verification procedures; inspect operations before executing them.
 - [Laravel Cloud guide](docs/LARAVEL_CLOUD.md): future single-application deployment

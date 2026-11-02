@@ -1,49 +1,101 @@
 <?php
 
 use Illuminate\Contracts\Console\Kernel;
-use Illuminate\Contracts\Http\Kernel as HttpKernel;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
+use Symfony\Component\Process\Process;
 
 require __DIR__.'/../vendor/autoload.php';
+
+if (is_file(__DIR__.'/../bootstrap/cache/config.php')
+    || ! empty($_SERVER['APP_CONFIG_CACHE'])
+    || ! empty($_ENV['APP_CONFIG_CACHE'])
+    || getenv('APP_CONFIG_CACHE')) {
+    fwrite(STDERR, "PostgreSQL verification requires uncached local configuration.\n");
+    exit(1);
+}
+
 $app = require __DIR__.'/../bootstrap/app.php';
 $app->make(Kernel::class)->bootstrap();
 
-$name = getenv('TEST_DATABASE');
-if (! is_string($name) || preg_match('/^starter_test_[0-9]+_[0-9]+$/', $name) !== 1) {
-    throw new RuntimeException('Only a generated starter_test_<timestamp>_<pid> database is allowed.');
+if (! $app->environment('local') || config('database.default') !== 'pgsql') {
+    fwrite(STDERR, "PostgreSQL verification requires the existing local pgsql environment.\n");
+    exit(1);
 }
 
-$connection = config('database.connections.pgsql');
-$connection['database'] = $name;
-$connection['url'] = null;
-config(['database.connections.verification' => $connection, 'database.default' => 'verification']);
+// Administrative credentials are used only for provisioning, never by the test process.
+$name = 'mealplaner_test_'.bin2hex(random_bytes(8));
+$password = bin2hex(random_bytes(32));
+$identifier = '"'.$name.'"';
+$databaseCreated = false;
+$roleCreated = false;
+$admin = null;
+$exitCode = 1;
 
-if (DB::connection()->getDriverName() !== 'pgsql' || DB::selectOne('SELECT current_database() AS name')->name !== $name) {
-    throw new RuntimeException('Isolated PostgreSQL connection failed.');
-}
+try {
+    $connection = DB::connection();
+    $admin = $connection->getPdo();
+    $configuration = $connection->getConfig();
+    $developmentDatabase = $connection->selectOne('SELECT current_database() AS name')->name;
 
-if (($argv[1] ?? '') === 'write') {
-    Artisan::call('migrate', ['--force' => true, '--no-interaction' => true]);
-    Schema::create('starter_verification', function (Blueprint $table): void {
-        $table->integer('id')->primary();
-        $table->string('value');
-    });
-    DB::table('starter_verification')->insert(['id' => 1, 'value' => 'survives-recreation']);
-} elseif (($argv[1] ?? '') === 'read') {
-    if (DB::table('starter_verification')->where('id', 1)->value('value') !== 'survives-recreation') {
-        throw new RuntimeException('PostgreSQL did not retain the test row.');
+    if ($name === $developmentDatabase || $connection->getDriverName() !== 'pgsql') {
+        throw new RuntimeException('An isolated PostgreSQL database is required.');
     }
-} else {
-    throw new RuntimeException('Use write or read.');
+
+    // PDO avoids application query logging of the generated test password.
+    $admin->exec('CREATE ROLE '.$identifier.' LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE PASSWORD '.$admin->quote($password));
+    $roleCreated = true;
+    $admin->exec('CREATE DATABASE '.$identifier.' OWNER '.$identifier." TEMPLATE template0 ENCODING 'UTF8'");
+    $databaseCreated = true;
+    $admin->exec('REVOKE ALL ON DATABASE '.$identifier.' FROM PUBLIC');
+
+    $process = new Process([
+        PHP_BINARY,
+        base_path('vendor/bin/phpunit'),
+        '--configuration',
+        base_path('phpunit.postgres.xml'),
+    ], base_path(), [
+        'APP_ENV' => 'testing',
+        'APP_DEBUG' => 'false',
+        'APP_KEY' => false,
+        'CACHE_STORE' => 'array',
+        'SESSION_DRIVER' => 'array',
+        'QUEUE_CONNECTION' => 'sync',
+        'MAIL_MAILER' => 'array',
+        'DB_CONNECTION' => 'pgsql',
+        'DB_URL' => '',
+        'DB_HOST' => $configuration['host'],
+        'DB_PORT' => (string) $configuration['port'],
+        'DB_DATABASE' => $name,
+        'DB_USERNAME' => $name,
+        'DB_PASSWORD' => $password,
+        'DB_SSLMODE' => $configuration['sslmode'],
+    ]);
+    $process->setTimeout(120);
+    $exitCode = $process->run();
+    echo str_replace($password, '[redacted]', $process->getOutput());
+    fwrite(STDERR, str_replace($password, '[redacted]', $process->getErrorOutput()));
+} catch (Throwable) {
+    // Connection/SQL exceptions may include credentials; never render their messages.
+    fwrite(STDERR, "PostgreSQL verification failed. Check local connectivity and provisioning permissions.\n");
+    $exitCode = 1;
+} finally {
+    // These flags refer only to resources successfully created by this invocation.
+    // Never force-disconnect other sessions or touch pre-existing databases/roles.
+    try {
+        if ($databaseCreated) {
+            $admin->exec('DROP DATABASE '.$identifier);
+        }
+        if ($roleCreated) {
+            $admin->exec('DROP ROLE '.$identifier);
+        }
+    } catch (Throwable) {
+        fwrite(STDERR, "Cleanup of generated PostgreSQL test resources failed; no forced cleanup was attempted.\n");
+        $exitCode = 1;
+    }
 }
 
-$response = $app->make(HttpKernel::class)->handle(Request::create('/api/ready', 'GET'));
-if ($response->getStatusCode() !== 200 || json_decode($response->getContent(), true) !== ['status' => 'ok', 'database' => 'connected']) {
-    throw new RuntimeException('Readiness endpoint failed against real PostgreSQL.');
+if ($exitCode === 0) {
+    echo "Isolated PostgreSQL migrations, restricted-role tests, and reconnect persistence passed; temporary resources removed.\n";
 }
 
-echo "Isolated PostgreSQL query, migrations, API, and persistence probe passed.\n";
+exit($exitCode);

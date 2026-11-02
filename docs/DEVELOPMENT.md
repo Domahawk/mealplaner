@@ -93,17 +93,38 @@ Polling is enabled for reliable bind-mount watching. Set `VITE_USE_POLLING=false
 
 ## Migrations and isolation
 
+Start with status inspection; this does not initialize the schema:
+
 ```bash
-docker compose exec backend php artisan migrate
-docker compose exec backend php artisan migrate:status
+docker compose exec -T --user app backend php artisan migrate:status
+docker compose exec -T --user app backend php artisan test
 sh scripts/verify-postgres.sh
 ```
 
-No migrations run automatically. The starter includes only Laravel's cache/cache-lock migrations. Sessions use files and queues run synchronously, so no user, session, or job tables are required.
+The existing development database has no migration repository. TASK-04 preserved it
+rather than assuming an empty database was safe to initialize. Apply reviewed pending
+migrations only after confirming the target is new, empty, dedicated, and authorized;
+otherwise leave its data/history untouched. No migrations run at startup and no reset
+commands are part of verification.
 
-PHPUnit forces `APP_ENV=testing`, `DB_CONNECTION=sqlite`, `DB_DATABASE=:memory:`, and array cache/session drivers. It does not use refresh/reset operations on the development database. Run tests without a production config cache; use `php artisan config:clear` locally if you previously cached configuration.
+Default PHPUnit still forces SQLite memory storage and array drivers. Both test
+configurations use a guarded bootstrap that rejects cached/unsafe effective settings.
+The PostgreSQL runner creates a unique database and restricted login, supplies only
+those credentials to `phpunit.postgres.xml`, applies the existing migration, and tests
+committed-record persistence after a new connection. It cleans up only the resources
+it created. It does not restart/recreate PostgreSQL or modify development data.
 
-The integration script creates a unique `starter_test_<timestamp>_<pid>` database, runs migrations and the actual readiness controller against PostgreSQL, writes a probe row, recreates only the PostgreSQL container, and checks the row survived. It drops only the database it successfully created. Existing development databases are not migrated or removed.
+`pdo_pgsql` is installed in the PHP container; PostgreSQL 18.6 was verified. The
+example now has a blank password and Mealplaner database/user placeholders; preserve
+actual `.env` settings and provide private local credentials when creating a new
+environment. `DB_HOST=postgres` is for the existing Compose network; host PostgreSQL
+normally uses `127.0.0.1`. No database port is currently published to the host.
+
+See [database.md](database.md) for exact variables, permissions, initial inspection,
+test isolation, migration rules, verified reconnect persistence, and the remaining
+TASK-05 container-lifecycle checks. The PostgreSQL test runner requires uncached local
+configuration and permission to provision isolated roles/databases; it fails rather
+than changing existing permissions or falling back to development data.
 
 ## Browser integration checks
 

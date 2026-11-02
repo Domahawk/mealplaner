@@ -90,15 +90,17 @@ task scope, inspect existing work, and preserve unrelated changes.
   failures without expanding into unrequested application changes. Distinguish passed,
   failed, blocked, and unexecuted checks explicitly.
 - Use isolated testing databases. Confirm the test environment and database before any
-  database-writing test. Current PHPUnit configuration uses SQLite `:memory:` and
-  array session/cache drivers. Never fall back to a development database.
+  database-writing test. Default PHPUnit uses SQLite `:memory:` and array drivers.
+  The guarded PostgreSQL suite receives a fresh database and restricted login from
+  `scripts/verify-postgres.php`; never pass development credentials to that suite or
+  bypass `tests/bootstrap.php`. Never fall back to a development database.
 - Never reset the development database. Do not run `migrate:fresh`, database resets,
   destructive SQL, or database-volume removal against development or production data.
   Run migrations only when the task authorizes them, after confirming the target.
-- The existing PostgreSQL verification script creates/drops a test database and
-  recreates the PostgreSQL container; the HMR browser test temporarily edits source
-  files. They are not read-only audit commands. Inspect their effects and task scope
-  before running them.
+- The PostgreSQL verification runner creates and removes only its own fresh test
+  database/login, and verifies reconnect persistence without restarting PostgreSQL.
+  The HMR browser test temporarily edits source files. These are not read-only audit
+  commands; inspect their effects and task scope before running them.
 - During audits, record missing dependencies rather than installing them automatically.
   Prefer already-running containers when host dependency volumes are unavailable;
   do not start/restart services or run dependency-installing entrypoints incidentally.

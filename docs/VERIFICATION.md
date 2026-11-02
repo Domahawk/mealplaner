@@ -1,5 +1,57 @@
 # Verification record
 
+## TASK-04 — PostgreSQL persistence (2026-11-02)
+
+Initial inspection is recorded in [database.md](database.md). The existing runtime
+is PostgreSQL 18.6, connected through Laravel 13.39.0/PHP 8.5.12 with `pdo_pgsql`.
+The separate PHP `pgsql` extension is absent and unnecessary. Current development
+permissions permit connectivity and DDL; its existing privileged role was preserved.
+
+Before changes, development had zero user relations/extra schemas and no migration
+repository. `php artisan migrate:status` returned **Migration table not found**.
+No development migration was run: pre-existing/empty did not establish newness or
+exclusive ownership. The source migration and history remain untouched. Only the
+newly created test database was migrated.
+
+The existing writable named volume covers the PostgreSQL data directory, with
+`fsync` and `synchronous_commit` on. The revised probe does not recreate containers.
+It uses administrative provisioning only to create a new random database/login,
+then runs tests with the restricted role's generated credentials. Its `finally`
+removes only successfully created resources. No actual environment file, application
+key, existing role/credential, service configuration, or frontend setting was changed.
+
+| Check                                      | Result                                                                                                                                                            |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Native Laravel PostgreSQL connection       | Passed; configured and connected driver is `pgsql`.                                                                                                               |
+| `php artisan --version`                    | Passed: Laravel 13.39.0.                                                                                                                                          |
+| Development `php artisan migrate:status`   | Executed; no migration repository. Left uninitialized rather than applying pending migrations.                                                                    |
+| `php artisan test --compact`               | Passed: **24 tests, 98 assertions**, isolated SQLite and guard regressions.                                                                                       |
+| `sh scripts/verify-postgres.sh`            | Passed: **3 PostgreSQL tests, 49 assertions**, existing migration/cache tables, actual restricted-role identity, readiness, and committed record after reconnect. |
+| `./vendor/bin/pint --test`                 | Passed: 33 PHP files.                                                                                                                                             |
+| Configured PHPStan/Larastan analysis       | Passed; no errors.                                                                                                                                                |
+| `npm run test:unit`                        | Passed: existing 10 frontend tests.                                                                                                                               |
+| Real HTTP `/api/health`, `/api/ready`, `/` | HTTP 200; health/readiness JSON contracts preserved.                                                                                                              |
+
+The persistence test observed a different `pg_backend_pid()` after Laravel purged
+and reconnected, then retrieved the committed probe record. Only that probe row and
+the fresh database/login created by the runner were removed. Post-checks found zero
+development relations, zero remaining generated test databases, and zero generated
+roles. There was no development reset or row modification.
+
+The new guards reproduced and resolved an inherited-environment issue: values in
+`$_SERVER` could retain local settings despite PHPUnit/`putenv` values. The bootstrap
+now matches Laravel's effective precedence and rejects unsafe configuration before
+boot; the child process explicitly receives testing/array settings and does not
+inherit a development application key. Regressions cover the conflicting inherited
+environment, custom cache path, non-testing mode, file-backed SQLite, URL overrides,
+ordinary PostgreSQL names, and mismatched roles. No test checks were disabled.
+
+The tested persistence claim is **commit/reconnect survival**, not PostgreSQL or
+Docker restart recovery. Container recreation, volume recovery, backup restore, and
+broader startup/lifecycle acceptance remain for TASK-05. No new Docker infrastructure,
+packages, auth/domain models, or migrations were introduced. The existing privileged
+development role also needs deliberate least-privilege review before production.
+
 ## TASK-03 — integrated Vue frontend (2026-11-02)
 
 The existing root Vue/Laravel integration, Router, Pinia, strict TypeScript, styling,
