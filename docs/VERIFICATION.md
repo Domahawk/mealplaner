@@ -1,59 +1,137 @@
-# Verification record
+# Verification record — starter architecture audit
 
-Status on 2026-11-02: source implementation is present, but the full acceptance criteria are **not complete**. This execution sandbox denies Docker socket access, outbound package-registry DNS, and local TCP listeners. No container runtime, PostgreSQL, real HTTP delivery, HMR, or browser offline behavior has been verified.
+Audited on **2026-11-02**. This record supersedes the earlier sandbox-only verification
+record: both lockfiles now exist, dependencies are installed in Compose named volumes,
+and four services were already running. No dependency installation, service startup,
+restart, database migration/reset, or application-code change was performed here.
 
-## Checks actually completed
+## Environment and method
 
-| Check                          | Result                                                                                                                                                                                     |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Compose configuration          | `docker compose config --quiet` passes with the example environment                                                                                                                        |
-| PHP source syntax              | All project PHP source files pass `php -l`                                                                                                                                                 |
-| Composer schema                | `composer validate --no-check-lock` passes                                                                                                                                                 |
-| PHP formatting                 | Cached Laravel Pint 1.24 passes; 29 files                                                                                                                                                  |
-| Frontend lint                  | ESLint 9.31 passes, including the committed test source                                                                                                                                    |
-| Frontend formatting            | Prettier 3.6.2 passes                                                                                                                                                                      |
-| Application type checking      | Vue TS compiler 3.0.3 / TypeScript 5.8.3 passes for application source, Vite configuration, Playwright configuration, and browser-test source                                              |
-| Supplementary component checks | 8 tests pass against the actual Vue app in JSDOM using native Vue mounting                                                                                                                 |
-| Application-key initialization | Actual script passes empty-key, absent-key, existing quoted-key, and repeat-start checks in isolated temporary files                                                                       |
-| Production compilation         | Vite 7.2.2 compiles 44 modules and emits Laravel's asset manifest, hashed JavaScript/CSS, and static offline shell                                                                         |
-| PWA generation                 | vite-plugin-pwa 2.0.0 generates the manifest and root-served worker with 7 precache entries                                                                                                |
-| Build artifact inspection      | `npm run verify:build` passes: entry assets exist, worker precache URLs are absolute and resolve to files, PNG dimensions match the manifest, and shell URLs have no development hostnames |
+Source, manifests, lockfiles, routes, Vite/Blade/Vue integration, tests, deployment
+references, and runtime scripts were inspected before changes. Checks used existing
+running containers rather than substituting dependencies or changing PHP requirements.
 
-The supplementary component checks covered mounting/welcome content with no automatic API request, Vue Router navigation, explicit theme switching and persistence, restored preferences, API success, safe database failure, network failure, and malformed API data. They used a temporary native Vue mount harness because Vue Test Utils was unavailable. They do **not** constitute a passing run of the committed Vue Test Utils suite.
+| Location                | Detected runtime                                        |
+| ----------------------- | ------------------------------------------------------- |
+| Host                    | PHP 8.4.1, Composer 2.8.3, Node.js 24.19.0, npm 11.17.0 |
+| `backend` container     | PHP 8.5.12, Composer 2.10.3, Laravel 13.39.0            |
+| `frontend` container    | Node.js 24.22.2, npm 11.19.1                            |
+| Database / HTTP service | PostgreSQL 18.6 / Nginx 1.30.6                          |
 
-Dependency-cache validation used temporary files outside the repository and a temporary node_modules link. The temporary harness, alternate TypeScript configuration, and node_modules link were removed afterward. Public build artifacts remain in `public/build/` and are Git-ignored. No host packages were installed.
+`docker compose ps --services --status running` listed `backend`, `frontend`, `nginx`,
+and `postgres`. The configured application database driver is `pgsql`. All 107
+installed Composer packages match the root lockfile; direct npm packages match their
+lockfile and `npm ls --depth=0` succeeds. See [architecture.md](architecture.md) for versions.
 
-## Blocked checks and missing artifacts
+Sandbox Docker socket access was initially denied. Approved execution outside the
+sandbox allowed read-only inspection and verification in those already-running services.
+No permission or dependency changes were used to bypass the project's requirements.
 
-- `docker compose up -d --build` fails with permission denied for `/var/run/docker.sock`. No project containers could be started.
-- Composer installation fails resolving `repo.packagist.org`. The available cache has Laravel 12 and no Larastan; it cannot produce the required Laravel 13 installation. **composer.lock and vendor are absent.**
-- The complete npm graph cannot be installed offline: Vue Test Utils and Chai declaration dependencies are unavailable in the package cache. **package-lock.json is absent.** A reduced temporary install was sufficient for compilation/linting and supplementary checks.
-- The committed `npm run type-check`, `npm run test`, and `npm run build` workflow remains unverified with its complete dependencies. Application-only strict checking and direct Vite production compilation passed separately.
-- `php artisan test` and PHPStan cannot run without the missing Composer installation. Pint was run from its real cached distribution, rather than vendor/bin.
-- A temporary HTTP artifact server fails to bind with `listen EPERM`. Production worker activation, offline reopening, update acceptance, real Laravel asset delivery, and HMR remain unverified.
-- PostgreSQL connectivity, migrations, and persistence require the running Compose environment. The isolated verification script is implemented but has not run.
+## Host checks
 
-The template is not ready to label fully tested or reproducible until **both lockfiles are generated, retained, and checked**. They have not been fabricated or replaced with lockfiles for a different dependency graph.
+| Command                               | Actual result                                                        |
+| ------------------------------------- | -------------------------------------------------------------------- |
+| `php artisan --version`               | Failed: host `vendor/autoload.php` is unavailable.                   |
+| `php artisan route:list`              | Failed for the same missing autoloader.                              |
+| `php artisan test`                    | Failed before tests could run for the same missing autoloader.       |
+| `composer validate --strict`          | Passed; manifest and lockfile are valid.                             |
+| `composer check-platform-reqs --lock` | Failed: host PHP 8.4.1 does not satisfy the root `^8.5` requirement. |
+| `npm run`                             | Passed; existing scripts enumerated and inspected.                   |
+| `npm run type-check`                  | Failed: host `vue-tsc` is unavailable.                               |
+| `npm run lint`                        | Failed: host `eslint` is unavailable.                                |
+| `npm run format:check`                | Failed: host `prettier` is unavailable.                              |
+| `npm run test`                        | Failed: host `vitest` is unavailable.                                |
+| `npm run build`                       | Failed at type checking because host `vue-tsc` is unavailable.       |
+| `docker compose config --quiet`       | Passed without printing resolved secrets.                            |
+| PHP source syntax via `php -l`        | Passed for all 29 application/configuration/test/helper PHP files.   |
 
-## Completing verification in an unrestricted environment
+These are host environment limitations, not evidence of missing lockfiles or a need
+to initialize/reinstall the application. Dependencies are available in container volumes.
 
-The normal startup command is still:
+## Checks in running containers
 
-```bash
-cp .env.example .env  # Only if .env does not already exist
-docker compose up -d --build
-```
+Backend commands use the prefix `docker compose exec -T --user app backend`;
+frontend commands use `docker compose exec -T --user node frontend`.
 
-For this unbootstrapped snapshot, the development entrypoints resolve missing lockfiles on the first successful startup. Later starts install from the lockfiles and reuse matching dependency volumes. Review and retain both generated lockfiles before using this repository as a template or deploying it.
+| Command after the prefix                     | Actual result                                                                                                          |
+| -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `php artisan --version`                      | Passed: Laravel Framework 13.39.0.                                                                                     |
+| `php artisan route:list -v`                  | Passed: API health, framework liveness, worker, SPA fallback, and generated GET/PUT storage routes; six entries total. |
+| `composer validate --strict`                 | Passed.                                                                                                                |
+| `composer check-platform-reqs`               | Passed with PHP 8.5.12.                                                                                                |
+| `php artisan test`                           | **Failed: 10 passed, 2 failed, 57 assertions.** No tests skipped after the frontend build.                             |
+| `./vendor/bin/pint --test`                   | **Failed: 2 style issues across 29 checked files.**                                                                    |
+| `./vendor/bin/phpstan analyse --no-progress` | Passed at configured level 8 with Larastan; no errors.                                                                 |
+| `npm ls --depth=0`                           | Passed; installed direct package versions inspected.                                                                   |
+| `npm run type-check`                         | Passed, including application and test/tool configuration.                                                             |
+| `npm run lint`                               | Passed.                                                                                                                |
+| `npm run format:check`                       | Passed before and after documentation formatting.                                                                      |
+| `npm run test`                               | Passed: 10 tests in `tests/frontend/app.test.ts`.                                                                      |
+| `npm run build`                              | Passed: Vue TSC plus Vite 7.3.7; 45 modules compiled.                                                                  |
+| `npm run verify:build`                       | Passed: entry/CSS, manifest, offline shell, worker URLs, and PNG icons.                                                |
 
-Then run the README quality commands, `sh scripts/verify-postgres.sh`, and the development/production Playwright procedures in [DEVELOPMENT.md](DEVELOPMENT.md). Build before rerunning PHP tests to exercise the production-asset test instead of its explicit missing-build skip. Record actual outcomes and fix any newly exposed failures.
+Build output includes `public/build/manifest.json`, hashed JavaScript/CSS,
+`manifest.webmanifest`, `offline.html`, and `sw.js`; Workbox precaches seven entries.
+The build ran before PHPUnit so the production-assets test was exercised rather than
+skipped. Generated build/cache output remains ignored.
 
-Manual checks still required:
+## Live HTTP checks
 
-1. Enable GitHub's template setting and create a fresh repository to check history isolation.
-2. Test Fedora bind-mount permissions and SELinux behavior with Docker running.
-3. Check real browser HMR, SPA reloads, service-worker installation, offline reopening, and the prompted update after a second build.
-4. Test standalone PWA installation on target devices over HTTPS.
-5. When separately authorized in the future, follow [LARAVEL_CLOUD.md](LARAVEL_CLOUD.md) to verify an actual Cloud deployment and managed PostgreSQL.
+Read-only requests against the already-running Nginx application at `127.0.0.1:8000`:
 
-No cloud deployment, paid resource creation, Git commits/pushes, database resets, host firewall changes, or unrelated-project modifications were performed.
+- `GET /up`: **HTTP 200**.
+- `GET /api/health`: **HTTP 200**, `Content-Type: application/json`,
+  `Cache-Control: no-store, private`, body `{"status":"ok","database":"connected"}`.
+
+These confirm liveness and a successful configured database query at audit time.
+They do not demonstrate migration status, backup recovery, volume persistence across
+recreation, a rendered browser session, or production offline behavior.
+
+## Existing failures and investigation
+
+### Production worker response assertion
+
+`tests/Feature/ProductionAssetsTest.php:21` expects `offline.html` through
+`assertSee()` on the `/sw.js` response. The route returns a Symfony
+`BinaryFileResponse`. A direct diagnostic confirmed `getContent()` is false while
+the built worker file does contain `offline.html`; artifact verification also passed.
+The failure concerns a file-response assertion rather than evidence that the offline
+shell was omitted. A follow-up should verify the file response/body delivery using
+appropriate assertions without removing the coverage.
+
+### Signed storage route status
+
+`tests/Feature/SpaTest.php:34` expects every excluded static/framework path to return 404. Laravel registers local-file routes because `config/filesystems.php` sets
+`local.serve` to true. The framework's `ServeFile` implementation checks its signature
+before existence and returns **403 for unsigned private requests outside production**
+(including testing). This explains `/storage/missing`; it is not the SPA entry.
+A follow-up should decide the intended signed-storage behavior and align its test
+with that contract while retaining namespace isolation coverage.
+
+### Pint style baseline
+
+Pint 1.32.1 reports existing issues in:
+
+- `bootstrap/providers.php`: `fully_qualified_strict_types` and
+  `single_line_after_imports`.
+- `tests/Feature/ProductionAssetsTest.php`: `fully_qualified_strict_types` and
+  `unary_operator_spaces`.
+
+No formatter was applied to PHP, no test expectations were weakened, and no failures
+were suppressed. Fixes are outside this audit's application-code scope.
+
+## Not executed and remaining work
+
+- No Composer/npm install or update commands, framework scaffolding, or lockfile changes.
+- No migrations, resets, seeders, PostgreSQL container recreation, or persistent-volume
+  operations. The separate PostgreSQL probe was inspected but not run because it
+  creates/drops a database, runs migrations, and recreates the database container.
+- No Playwright/browser/HMR/offline/update/device-installation tests. The HMR test
+  temporarily edits application source and is not a read-only audit check.
+- No deployment, paid resources, CI configuration, architecture replacement, or Git
+  commit/push. The existing cloud guide remains a future reference; its provider
+  assumptions and secret-handling instructions require review before use.
+
+Fix the two test-contract mismatches and two PHP formatting issues in scoped follow-up
+work. The architecture matches the integrated application requirements, but the full
+backend verification suite is **not green**.

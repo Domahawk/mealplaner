@@ -1,0 +1,263 @@
+# Mealplaner architecture
+
+## Audit scope and conclusion
+
+Audited on **2026-11-02** from source, both root manifests/lockfiles, installed packages
+in the already-running Compose services, and non-destructive verification commands.
+Mealplaner is an existing **single Laravel application with an integrated Vue SPA**.
+It matches the required architecture; no architectural replacement or restructuring
+is needed. There are no `backend/` or `frontend/` application directories.
+
+The current interface is a reusable starter. Mealplaner's **MVP v0.1.0** domain features
+are planned: registration/login/logout; user-owned nutritional products; recipes and
+quantity-based nutrition calculation; dated consumption records; and daily calorie,
+protein, carbohydrate, and fat totals. None of those features is implemented yet.
+
+## Detected technology and versions
+
+The versions below are locked and installed in the running containers unless described
+as runtime/image versions. They are observations, not newly selected dependencies.
+
+| Area                             | Requirement or configuration                             | Detected version                                                                     |
+| -------------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| PHP                              | Root Composer requirement `^8.5`; `php:8.5-fpm-bookworm` | 8.5.12 in `backend`; host PHP is 8.4.1 and incompatible with the project requirement |
+| Composer                         | Existing image uses Composer 2                           | 2.10.3 in `backend`; 2.8.3 on host                                                   |
+| Laravel                          | `laravel/framework: ^13.0`                               | 13.39.0                                                                              |
+| Vue                              | `vue: ^3.5.17`                                           | 3.5.44                                                                               |
+| Vue Router / Pinia               | `^4.5.1` / `^3.0.3`                                      | 4.6.4 / 3.0.4                                                                        |
+| TypeScript / Vue TSC             | `~5.8.3` / `^3.0.3`                                      | 5.8.3 / 3.3.14                                                                       |
+| Vite                             | `^7.2.2`                                                 | 7.3.7                                                                                |
+| Laravel Vite plugin / Vue plugin | `^2.0.0` / `^6.0.0`                                      | 2.1.0 / 6.0.10                                                                       |
+| PWA build support                | `vite-plugin-pwa: ^2.0.0`, Workbox generation            | 2.0.0                                                                                |
+| Node.js / npm                    | Node engine `^22.12.0                                    |                                                                                      | >=24.0.0`; `node:24-bookworm-slim` | 24.22.2 / 11.19.1 in `frontend`; 24.19.0 / 11.17.0 on host |
+| PostgreSQL                       | `postgres:18-alpine`                                     | 18.6 in the running service                                                          |
+| Nginx                            | `nginx:stable-alpine`                                    | 1.30.6 in the running service                                                        |
+| Backend tests                    | PHPUnit                                                  | 12.5.43                                                                              |
+| PHP formatting                   | Laravel Pint, Laravel preset                             | 1.32.1                                                                               |
+| PHP analysis                     | PHPStan level 8 with Larastan                            | 2.3.4 / 3.13.2                                                                       |
+| Frontend tests                   | Vitest, Vue Test Utils, JSDOM                            | 4.1.12 / 2.5.1 / 27.4.0                                                              |
+| Frontend lint/format             | ESLint, Prettier                                         | 9.39.5 / 3.9.10                                                                      |
+| Browser tests                    | Playwright                                               | 1.64.1                                                                               |
+
+All **107 Composer packages** installed in the PHP container match `composer.lock`.
+Direct JavaScript installed versions match `package-lock.json`; `npm ls --depth=0`
+succeeds. The host has dependency mount directories but no usable Composer autoloader
+or Node tools. Dependencies live in Compose named volumes; they were not reinstalled.
+
+No Inertia, Livewire, Sanctum, Fortify, Breeze, or Jetstream dependency was found.
+Reserved names in routing expressions are exclusions, not evidence of installed packages.
+
+## Structure and integration
+
+```text
+mealplaner/
+├── app/Http/Controllers/        # Laravel HTTP code, including HealthController
+├── app/Providers/              # Application service provider
+├── bootstrap/                  # Laravel bootstrapping and route registration
+├── config/                     # Laravel environment-based configuration
+├── database/                   # Cache/cache-lock migration and empty seeder
+├── resources/
+│   ├── js/                     # Vue SPA, router, stores, composables, lib, views
+│   ├── css/app.css             # Responsive light/dark application styling
+│   └── views/app.blade.php     # Laravel-served HTML entry
+├── routes/                     # web.php, api.php, console.php
+├── public/                     # Web root, icons, generated build output
+├── tests/                      # PHPUnit Feature/Unit, Vitest frontend, Playwright e2e
+├── docker/                     # Existing PHP, Node, and Nginx development configuration
+├── scripts/                    # Key initialization and verification helpers
+├── docs/                       # Architecture, development, deployment, verification
+├── compose.yaml                # Four local runtime services for the same application
+├── composer.json / composer.lock
+├── package.json / package-lock.json
+├── vite.config.ts / vitest.config.ts / tsconfig.json
+├── phpunit.xml / phpstan.neon / pint.json
+└── AGENTS.md / README.md
+```
+
+Laravel serves `resources/views/app.blade.php`, which creates `#app`, supplies public
+application-name metadata, and calls `@vite('resources/js/app.ts')`. The TypeScript entry
+imports CSS, creates Vue, registers Pinia and Vue Router, and mounts `App.vue`.
+`vite.config.ts` uses `laravel-vite-plugin` and `@vitejs/plugin-vue`; it does not define
+a second application. Vue components with logic use Composition API and typed script setup.
+
+In development, Blade uses the Vite hot-file mechanism to reference Vite modules/HMR.
+In production, it uses the Laravel asset manifest under `public/build/`. Node is a
+development/build tool; production deployment is one Laravel release serving the HTML,
+compiled Vue assets, and REST API from one origin.
+
+```mermaid
+flowchart LR
+    Browser["Browser: Vue 3, Vue Router, Pinia"]
+    Web["Nginx locally / production web host"]
+    Laravel["Root Laravel app: Blade, HTTP routes, REST API"]
+    Postgres[(PostgreSQL)]
+    Vite["Vite development server and build tool"]
+
+    Browser -->|HTML and same-origin API requests| Web
+    Web -->|PHP requests through public/index.php| Laravel
+    Laravel -->|Database access| Postgres
+    Web -->|Compiled static assets| Browser
+    Vite -->|Development modules and HMR| Browser
+    Vite -.->|Production files in public/build| Web
+```
+
+## Responsibilities and existing capabilities
+
+- **Laravel:** HTML entry delivery, web/API boundaries, JSON exception responses,
+  liveness and database connectivity endpoints. Future validation, authentication,
+  authorization, nutrition calculations, and persistence belong here.
+- **Vue:** starter welcome/about/not-found screens, navigation, responsive presentation,
+  loading/error/success connectivity states, theme preference, and PWA update notice.
+  Future user workflows extend these existing components and conventions.
+- **Pinia:** existing `theme` and `connection` stores support real shared state.
+  The theme follows the system or an explicit persisted browser preference.
+- **HTTP boundary:** `resources/js/lib/api.ts` calls relative `/api/health` only when
+  the user requests a connection check. It uses an eight-second timeout, validates
+  the response shape, and handles database/network failures. There is no automatic
+  connectivity polling or separate frontend API origin to configure.
+- **PostgreSQL:** intended persistent storage, with a configured `pgsql` connection
+  and running development service. Current application database use is a `SELECT 1`
+  connectivity probe, not domain persistence. Laravel includes Eloquent; no domain
+  models or product/recipe/consumption schema exist yet.
+
+## Routing
+
+`bootstrap/app.php` registers `routes/web.php`, `routes/api.php` under the standard
+`/api` prefix, console routes, and Laravel's `/up` route. API and JSON-request
+exceptions use JSON rendering. The existing route listing contains six entries:
+
+| Route                 | Current behavior                                                                                                                                                           |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/health`     | Public API middleware route; queries the configured database. HTTP 200 with `{"status":"ok","database":"connected"}` or safe JSON 503 when unavailable; no-store response. |
+| `GET /up`             | Laravel application liveness; no explicit application database query.                                                                                                      |
+| `GET /sw.js`          | Serves the built worker as a file with JavaScript MIME type, no-store cache header, and root worker scope; 404 if not built.                                               |
+| `GET /{path?}`        | Web middleware SPA fallback to the Blade entry, excluding API/framework/static namespaces and dotted file paths.                                                           |
+| `GET /storage/{path}` | Laravel-generated signed local-file route because the local disk has `serve: true`.                                                                                        |
+| `PUT /storage/{path}` | Laravel-generated signed local-file upload route from the same disk configuration.                                                                                         |
+
+The browser router uses HTML5 history, with `/` (welcome), `/about`, and a catch-all
+Not Found view. Laravel must serve the SPA entry for client deep links while retaining
+JSON API errors and separate static/framework handling. New server namespaces must
+be excluded from both the Laravel SPA fallback and the Workbox navigation fallback.
+There are no authentication guards or protected domain routes.
+
+## Authentication and future authorization
+
+Authentication is **not implemented**: there are no registration/login/logout routes,
+User model, user migration, application auth configuration, or installed auth packages.
+File-session settings alone do not constitute authentication. Do not assume Sanctum
+is installed because `sanctum` appears in namespace exclusions.
+
+Future authentication should extend Laravel-native authentication and the existing
+same-origin SPA: server-owned sessions, framework password hashing, CSRF protection,
+and server-side authorization. The authentication task must establish the guard,
+provider, user persistence, and whether Sanctum is needed; it must not introduce a
+parallel application or custom token scheme incidentally. User-owned domain data
+and referenced products/recipes will need ownership checks before those features ship.
+
+## Persistence and environment
+
+`config/database.php` defaults to PostgreSQL, with an explicitly separate in-memory
+SQLite connection for tests. Only a framework cache/cache-lock migration and an empty
+seeder are present. No migrations, resets, seeders, or database configuration changes
+were performed by this audit. A successful health probe confirms connectivity at
+audit time; it does not validate migrations, schema, backups, or persistent-volume recovery.
+
+Root `.env.example` currently documents local PostgreSQL, file sessions/cache,
+synchronous queues, log mail, application naming, and Vite/Compose settings. Real local
+environment files are ignored and were not inspected. `VITE_*` values are public build
+inputs; credentials and application keys must stay private. Browser-visible names/URLs
+and Docker-internal database/service names have different consumers.
+
+Some Laravel configuration fallback values remain `database` for sessions/cache/queues,
+while the example explicitly selects `file`/`file`/`sync`. Maintain those environment
+settings until corresponding persistence is intentionally implemented; missing variables
+could select tables that do not exist. Future multi-replica sessions need deliberate
+shared storage rather than assuming current file sessions are sufficient.
+
+## Testing and quality architecture
+
+- PHPUnit covers isolated SQLite connectivity, safe health errors, liveness, SPA/API
+  route boundaries, production assets, and key-initializer behavior using temporary
+  synthetic environment files. Runtime tests check required PHP extensions.
+- `phpunit.xml` forces testing mode, SQLite memory storage, an empty database URL,
+  and array session/cache/mail drivers. No database refresh/reset traits are used.
+  No cached application configuration was present during the audit.
+- Vitest uses JSDOM and Vue Test Utils with real route definitions, fresh Pinia,
+  memory history, a matchMedia stub, and mocked HTTP responses. Ten tests cover
+  startup without requests, routing, theme behavior, loading, connectivity, retries,
+  and invalid responses.
+- Playwright tests exist for live HTTP/browser integration, development asset loading,
+  production offline behavior, and HMR. The HMR test temporarily rewrites Vue/CSS
+  files. Browser tests were inspected but not executed in this source-preserving audit.
+- Pint uses the Laravel preset. PHPStan/Larastan analyzes `app`, bootstrap, and routes
+  at level 8. ESLint, Prettier, strict Vue TSC, and a type-checked Vite build are configured.
+- `scripts/verify-build.mjs` verifies emitted assets, offline shell, root-absolute
+  worker precache URLs, manifests, and PNG icons without a database.
+- `scripts/verify-postgres.sh` creates/drops an isolated database, runs migrations and
+  writes there, and recreates the PostgreSQL container. It was not executed: those
+  operations are outside this audit's non-destructive scope.
+
+Current verification is mixed: frontend checks/build, PHPStan, and live health requests
+pass, but two backend tests and two Pint style checks fail. See the detailed commands,
+diagnoses, and host/container distinctions in [VERIFICATION.md](VERIFICATION.md).
+
+## Infrastructure and deployment
+
+Existing Compose services are `postgres`, `backend` (PHP-FPM/Composer), `frontend`
+(Node/Vite), and `nginx`. They use the same root checkout. Names are process roles,
+not application or service-domain boundaries. The four services were already running;
+the audit did not start, restart, recreate, or install anything.
+
+The database uses a named persistent volume and has no published host port. PHP and
+Node dependencies/cache use named volumes, explaining absent host dependencies. Source
+bind mounts support development and use SELinux `:z`; UID/GID build arguments map
+development ownership. Nginx publishes loopback port 8000 by default; Vite publishes
+5173 for modules/HMR only. Nginx's document root is `public/`, with PHP-FPM forwarding.
+
+Entrypoints install dependencies when fingerprints change and initialize an empty
+application key without replacing an existing key. Startup does not migrate. Their
+existence is not permission to run installation/startup during an audit.
+
+Production PWA support already exists: build-time offline shell generation, manifest,
+icons, root-scoped worker delivery, static precaching, and a prompted update flow.
+The app registers the worker only in production. APIs are excluded from offline
+navigation fallback; no runtime API caching, background sync, or offline domain data
+store is configured. Build artifacts passed validation; actual offline/update/browser
+installation behavior was not tested by this audit.
+
+`docs/LARAVEL_CLOUD.md` describes a future single-application deployment rooted here.
+There is no verified cloud deployment or CI workflow in this checkout. Provider-specific
+instructions must be reviewed at deployment time, especially secret-handling steps:
+the permanent instructions forbid displaying keys or inspecting credential values.
+Development Compose configuration is not the production deployment contract.
+
+## Decisions, debt, and next steps
+
+1. **Preserve the integrated monolith.** It already provides the required root Laravel,
+   integrated Vue/TypeScript, Laravel Vite plugin, Router, Pinia, PostgreSQL direction,
+   and single deployment. No Inertia or duplicate application is needed.
+2. **Resolve existing backend verification failures in a scoped follow-up.** The
+   production-worker test asserts inline content on `BinaryFileResponse`, whose
+   `getContent()` returns false even though the generated worker contains `offline.html`.
+   The namespace test expects `/storage/missing` to be 404, but Laravel's private
+   local-file handler rejects unsigned requests with 403 outside production. Align
+   tests with intended contracts rather than weakening them blindly.
+3. **Review the existing local-file serving contract.** The generated GET/PUT storage
+   routes are protected by signed requests; their existence is not SPA fallback
+   leakage. Decide their intended role during later storage work without disabling
+   framework functionality as part of this audit.
+4. **Apply the two existing Pint corrections in a separate code-quality task.** They
+   affect `bootstrap/providers.php` and `tests/Feature/ProductionAssetsTest.php`.
+5. **Keep runtime and documentation claims accurate.** Host PHP 8.4.1 cannot satisfy
+   this root application's PHP 8.5 requirement. Use the existing PHP 8.5 container.
+   Both lockfiles already exist and match installed dependencies; the earlier
+   verification record's missing-lockfile claims have been replaced by this audit.
+6. **Plan missing domain/auth work without scaffolding again.** Starter metadata,
+   welcome copy, and default application name are still generic. Branding, auth,
+   ownership, domain schema, nutrition rules, CI, browser/PWA acceptance, and deployment
+   remain scoped future work. `docs/NEW_PROJECT.md` is template-reuse reference, not
+   an instruction to initialize another project inside Mealplaner.
+
+No architecture conflict was found. Test failures, environment differences, and
+missing MVP capabilities are documented limitations, not reasons to replace the starter.
