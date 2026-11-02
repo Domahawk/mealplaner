@@ -14,7 +14,8 @@ Node/Vite provide development assets and build the frontend bundle.
 Implemented starter capabilities include welcome/about/not-found views, Vue Router
 navigation, Pinia-backed light/dark/system preferences, a user-triggered API/database
 connection check, Laravel liveness, and production PWA build support with an offline
-shell and prompted updates. The branding and default application name are still generic.
+shell and prompted updates. Welcome/PWA copy still contains starter branding; the
+backend application-name default and environment example now use `Mealplaner`.
 No Inertia, Livewire, or authentication package is installed.
 
 Planned MVP capabilities, **not yet implemented**:
@@ -92,7 +93,11 @@ test -f .env || cp .env.example .env
 Supply local database credentials privately in the ignored environment. Preserve any
 existing environment and application key. Keep the example's file-session/file-cache
 and synchronous-queue settings until persistence requirements are deliberately changed.
-Set local UID/GID appropriately for host ownership. Never print environment contents,
+Set local UID/GID appropriately for host ownership. `APP_NAME` remains configurable;
+existing local overrides are preserved rather than overwritten. The current public
+name override is `MealPlaner`, while the example/default spelling is `Mealplaner`.
+Logging uses the existing stack/single-file channel under `storage/logs/laravel.log`;
+never log credentials or request secrets. Never print environment contents,
 keys, or resolved configuration containing credentials.
 
 Normal development startup, when needed:
@@ -107,12 +112,13 @@ and initialize only an empty application key. They never run migrations. Startup
 not an audit command: this audit reused already-running containers and installed nothing.
 See [DEVELOPMENT.md](docs/DEVELOPMENT.md) for the existing detailed workflow.
 
-| Default URL                        | Purpose                                                                                              |
-| ---------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `http://localhost:8000`            | Application entry: Laravel serves the Vue SPA.                                                       |
-| `http://localhost:5173`            | Vite development modules/HMR, not a standalone application.                                          |
-| `http://localhost:8000/up`         | Laravel liveness.                                                                                    |
-| `http://localhost:8000/api/health` | Database-backed readiness: HTTP 200 with `{"status":"ok","database":"connected"}`, or safe JSON 503. |
+| Default URL                        | Purpose                                                                                                       |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `http://localhost:8000`            | Application entry: Laravel serves the Vue SPA.                                                                |
+| `http://localhost:5173`            | Vite development modules/HMR, not a standalone application.                                                   |
+| `http://localhost:8000/up`         | Laravel liveness.                                                                                             |
+| `http://localhost:8000/api/health` | Public, database-independent API liveness: HTTP 200 with `{"status":"ok"}`.                                   |
+| `http://localhost:8000/api/ready`  | Existing database-backed readiness: HTTP 200 with `{"status":"ok","database":"connected"}`, or safe JSON 503. |
 
 Vue Router handles `/`, `/about`, and unknown client routes without full reloads.
 Laravel excludes API/framework/static namespaces from its SPA fallback. The existing
@@ -138,17 +144,21 @@ docker compose exec -T --user node frontend npm run build
 docker compose exec -T --user node frontend npm run verify:build
 ```
 
-Current audit results: **10 frontend tests pass**, type checking, lint/format checks,
-production build/artifact verification, PHPStan, Composer checks, and live health
-requests pass. **PHPUnit has 10 passing and 2 failing tests; Pint reports 2 style
-issues.** These existing failures were investigated and documented without modifying
-application code. See [VERIFICATION.md](docs/VERIFICATION.md) for diagnoses and commands.
-The starter is not fully green.
+TASK-02 verification passes: **15 backend tests / 76 assertions**, **10 frontend
+tests**, Pint, PHPStan, type checking, lint/format checks, production build/artifact
+verification, Composer checks, and live HTTP health/readiness/SPA requests. The two
+backend test-contract mismatches and two formatting issues found by TASK-01 are fixed.
+The public health test also passes with an unconfigured database connection. See
+[VERIFICATION.md](docs/VERIFICATION.md) for current results and the historical baseline.
 
 PHPUnit forces an isolated in-memory SQLite connection and array drivers. Never reset
 the development database or run migrations as an incidental verification step.
-The separate PostgreSQL probe creates/drops a test database and recreates its service;
-it was inspected but not run. Browser/HMR/offline checks were not executed in this audit.
+The existing connection-check UI now calls `/api/ready`; `/api/health` deliberately
+does not report database availability. PostgreSQL settings and the running service
+remain unchanged. Domain schema, migrations, and persistence/recovery validation
+belong to later tasks. The separate PostgreSQL probe creates/drops a test database
+and recreates its service; it was updated to use readiness but not executed. Browser,
+HMR, and offline behavior were not rerun for this backend stabilization task.
 
 `npm run dev` starts Vite; `npm run format` modifies files and should be used only
 within the intended change scope. `npm run test:e2e` requires deliberate browser/runtime
@@ -159,7 +169,8 @@ setup, and its HMR test temporarily edits source. Do not remove database volumes
 - [AGENTS.md](AGENTS.md): permanent architecture, coding, verification, and safety rules.
 - [Architecture](docs/architecture.md): integration, routing, ownership direction,
   infrastructure, detected versions, decisions, and technical debt.
-- [Verification record](docs/VERIFICATION.md): results from this audit and known failures.
+- [Verification record](docs/VERIFICATION.md): current stabilization results and the
+  historical architecture-audit baseline.
 - [Development guide](docs/DEVELOPMENT.md): containers, HMR, persistence, and existing
   verification procedures; inspect operations before executing them.
 - [Laravel Cloud guide](docs/LARAVEL_CLOUD.md): future single-application deployment
@@ -168,7 +179,6 @@ setup, and its HMR test temporarily edits source. Do not remove database volumes
 - [Template reuse guide](docs/NEW_PROJECT.md): reference for creating a different
   project from the starter; do not use it to scaffold another application here.
 
-Recommended follow-up work is to address the two existing backend test mismatches and
-Pint issues, then implement branding/auth/domain features within this integrated
-application. No database schema change, CI workflow, cloud deployment, or application
-restructuring is part of this audit.
+Next steps are the scoped branding, authentication, and domain features within this
+integrated application. No database schema change, CI workflow, cloud deployment,
+or application restructuring was introduced by backend stabilization.

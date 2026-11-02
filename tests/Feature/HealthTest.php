@@ -21,9 +21,27 @@ class HealthTest extends TestCase
         $this->assertNotEmpty(DB::select('SELECT 1'));
     }
 
-    public function test_health_checks_an_actual_query(): void
+    public function test_health_is_public_and_returns_the_expected_json(): void
     {
-        $this->getJson('/api/health')
+        $this->get('/api/health')
+            ->assertOk()
+            ->assertHeader('Content-Type', 'application/json')
+            ->assertExactJson(['status' => 'ok'])
+            ->assertHeader('Cache-Control', 'no-store, private');
+    }
+
+    public function test_health_does_not_require_a_database_connection(): void
+    {
+        config(['database.default' => 'unconfigured']);
+
+        $this->get('/api/health')
+            ->assertOk()
+            ->assertExactJson(['status' => 'ok']);
+    }
+
+    public function test_readiness_checks_an_actual_query(): void
+    {
+        $this->getJson('/api/ready')
             ->assertOk()
             ->assertExactJson(['status' => 'ok', 'database' => 'connected'])
             ->assertHeader('Cache-Control', 'no-store, private');
@@ -37,7 +55,7 @@ class HealthTest extends TestCase
             ->andThrow(new RuntimeException('postgres://private-user:private-password@private-host'));
         DB::shouldReceive('connection')->once()->andReturn($connection);
 
-        $this->getJson('/api/health')
+        $this->getJson('/api/ready')
             ->assertStatus(503)
             ->assertExactJson([
                 'status' => 'error',

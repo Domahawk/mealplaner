@@ -41,9 +41,9 @@ if (($argv[1] ?? '') === 'write') {
     throw new RuntimeException('Use write or read.');
 }
 
-$response = $app->make(HttpKernel::class)->handle(Request::create('/api/health', 'GET'));
+$response = $app->make(HttpKernel::class)->handle(Request::create('/api/ready', 'GET'));
 if ($response->getStatusCode() !== 200 || json_decode($response->getContent(), true) !== ['status' => 'ok', 'database' => 'connected']) {
-    throw new RuntimeException('Health endpoint failed against real PostgreSQL.');
+    throw new RuntimeException('Readiness endpoint failed against real PostgreSQL.');
 }
 
 echo "Isolated PostgreSQL query, migrations, API, and persistence probe passed.\n";

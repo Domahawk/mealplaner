@@ -6,7 +6,9 @@ Audited on **2026-11-02** from source, both root manifests/lockfiles, installed 
 in the already-running Compose services, and non-destructive verification commands.
 Mealplaner is an existing **single Laravel application with an integrated Vue SPA**.
 It matches the required architecture; no architectural replacement or restructuring
-is needed. There are no `backend/` or `frontend/` application directories.
+is needed. There are no `backend/` or `frontend/` application directories. TASK-02
+subsequently stabilized database-independent health, preserved database readiness, and
+resolved the audit's test/formatting failures without changing this architecture.
 
 The current interface is a reusable starter. Mealplaner's **MVP v0.1.0** domain features
 are planned: registration/login/logout; user-owned nutritional products; recipes and
@@ -51,7 +53,7 @@ Reserved names in routing expressions are exclusions, not evidence of installed 
 
 ```text
 mealplaner/
-├── app/Http/Controllers/        # Laravel HTTP code, including HealthController
+├── app/Http/Controllers/        # Laravel HTTP code, including ReadinessController
 ├── app/Providers/              # Application service provider
 ├── bootstrap/                  # Laravel bootstrapping and route registration
 ├── config/                     # Laravel environment-based configuration
@@ -111,7 +113,7 @@ flowchart LR
   Future user workflows extend these existing components and conventions.
 - **Pinia:** existing `theme` and `connection` stores support real shared state.
   The theme follows the system or an explicit persisted browser preference.
-- **HTTP boundary:** `resources/js/lib/api.ts` calls relative `/api/health` only when
+- **HTTP boundary:** `resources/js/lib/api.ts` calls relative `/api/ready` only when
   the user requests a connection check. It uses an eight-second timeout, validates
   the response shape, and handles database/network failures. There is no automatic
   connectivity polling or separate frontend API origin to configure.
@@ -124,16 +126,17 @@ flowchart LR
 
 `bootstrap/app.php` registers `routes/web.php`, `routes/api.php` under the standard
 `/api` prefix, console routes, and Laravel's `/up` route. API and JSON-request
-exceptions use JSON rendering. The existing route listing contains six entries:
+exceptions use JSON rendering. The existing route listing contains seven entries:
 
-| Route                 | Current behavior                                                                                                                                                           |
-| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /api/health`     | Public API middleware route; queries the configured database. HTTP 200 with `{"status":"ok","database":"connected"}` or safe JSON 503 when unavailable; no-store response. |
-| `GET /up`             | Laravel application liveness; no explicit application database query.                                                                                                      |
-| `GET /sw.js`          | Serves the built worker as a file with JavaScript MIME type, no-store cache header, and root worker scope; 404 if not built.                                               |
-| `GET /{path?}`        | Web middleware SPA fallback to the Blade entry, excluding API/framework/static namespaces and dotted file paths.                                                           |
-| `GET /storage/{path}` | Laravel-generated signed local-file route because the local disk has `serve: true`.                                                                                        |
-| `PUT /storage/{path}` | Laravel-generated signed local-file upload route from the same disk configuration.                                                                                         |
+| Route                 | Current behavior                                                                                                                                                                 |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/health`     | Public API middleware route; HTTP 200 with exactly `{"status":"ok"}` and no database query. No-store response.                                                                   |
+| `GET /api/ready`      | Existing database readiness probe, retained in ReadinessController; HTTP 200 with `{"status":"ok","database":"connected"}` or safe JSON 503 when unavailable. No-store response. |
+| `GET /up`             | Laravel application liveness; no explicit application database query.                                                                                                            |
+| `GET /sw.js`          | Serves the built worker as a file with JavaScript MIME type, no-store cache header, and root worker scope; 404 if not built.                                                     |
+| `GET /{path?}`        | Web middleware SPA fallback to the Blade entry, excluding API/framework/static namespaces and dotted file paths.                                                                 |
+| `GET /storage/{path}` | Laravel-generated signed local-file route because the local disk has `serve: true`.                                                                                              |
+| `PUT /storage/{path}` | Laravel-generated signed local-file upload route from the same disk configuration.                                                                                               |
 
 The browser router uses HTML5 history, with `/` (welcome), `/about`, and a catch-all
 Not Found view. Laravel must serve the SPA entry for client deep links while retaining
@@ -160,13 +163,18 @@ and referenced products/recipes will need ownership checks before those features
 `config/database.php` defaults to PostgreSQL, with an explicitly separate in-memory
 SQLite connection for tests. Only a framework cache/cache-lock migration and an empty
 seeder are present. No migrations, resets, seeders, or database configuration changes
-were performed by this audit. A successful health probe confirms connectivity at
-audit time; it does not validate migrations, schema, backups, or persistent-volume recovery.
+were performed by the audit or TASK-02. A successful `/api/ready` probe confirms
+connectivity at verification time; it does not validate migrations, schema, backups,
+or persistent-volume recovery. `/api/health` remains operational when no database
+connection is configured.
 
 Root `.env.example` currently documents local PostgreSQL, file sessions/cache,
 synchronous queues, log mail, application naming, and Vite/Compose settings. Real local
 environment files are ignored and were not inspected. `VITE_*` values are public build
-inputs; credentials and application keys must stay private. Browser-visible names/URLs
+inputs; credentials and application keys must stay private. TASK-02 sets the
+application-name example/fallback to `Mealplaner` and preserves existing local
+overrides, including the current public spelling `MealPlaner`. Logging remains the
+existing stack/single-file configuration. Browser-visible names/URLs
 and Docker-internal database/service names have different consumers.
 
 Some Laravel configuration fallback values remain `database` for sessions/cache/queues,
@@ -177,7 +185,8 @@ shared storage rather than assuming current file sessions are sufficient.
 
 ## Testing and quality architecture
 
-- PHPUnit covers isolated SQLite connectivity, safe health errors, liveness, SPA/API
+- PHPUnit covers database-independent public health, isolated SQLite readiness,
+  safe readiness errors, liveness, SPA/API
   route boundaries, production assets, and key-initializer behavior using temporary
   synthetic environment files. Runtime tests check required PHP extensions.
 - `phpunit.xml` forces testing mode, SQLite memory storage, an empty database URL,
@@ -198,9 +207,11 @@ shared storage rather than assuming current file sessions are sufficient.
   writes there, and recreates the PostgreSQL container. It was not executed: those
   operations are outside this audit's non-destructive scope.
 
-Current verification is mixed: frontend checks/build, PHPStan, and live health requests
-pass, but two backend tests and two Pint style checks fail. See the detailed commands,
-diagnoses, and host/container distinctions in [VERIFICATION.md](VERIFICATION.md).
+TASK-02 verification passes: 15 backend tests with 76 assertions, 10 frontend
+tests, Pint, PHPStan, frontend checks/build, and live health/readiness/SPA requests.
+The audit's two test-contract mismatches and two Pint issues are resolved. See the
+commands, historical diagnoses, and host/container distinctions in
+[VERIFICATION.md](VERIFICATION.md).
 
 ## Infrastructure and deployment
 
@@ -237,27 +248,26 @@ Development Compose configuration is not the production deployment contract.
 1. **Preserve the integrated monolith.** It already provides the required root Laravel,
    integrated Vue/TypeScript, Laravel Vite plugin, Router, Pinia, PostgreSQL direction,
    and single deployment. No Inertia or duplicate application is needed.
-2. **Resolve existing backend verification failures in a scoped follow-up.** The
-   production-worker test asserts inline content on `BinaryFileResponse`, whose
-   `getContent()` returns false even though the generated worker contains `offline.html`.
-   The namespace test expects `/storage/missing` to be 404, but Laravel's private
-   local-file handler rejects unsigned requests with 403 outside production. Align
-   tests with intended contracts rather than weakening them blindly.
+2. **Backend smoke-test contracts are corrected by TASK-02.** The production-worker
+   test now asserts the binary response's exact file target and offline-shell content.
+   Static/framework paths retain their 404 assertions; the signed private storage
+   route has a dedicated 403/no-SPA assertion for unsigned requests. Coverage remains
+   explicit without changing framework storage or web routing behavior.
 3. **Review the existing local-file serving contract.** The generated GET/PUT storage
    routes are protected by signed requests; their existence is not SPA fallback
    leakage. Decide their intended role during later storage work without disabling
    framework functionality as part of this audit.
-4. **Apply the two existing Pint corrections in a separate code-quality task.** They
-   affect `bootstrap/providers.php` and `tests/Feature/ProductionAssetsTest.php`.
+4. **The audit's two Pint corrections are applied by TASK-02.** Provider/test imports
+   and unary-operator spacing follow the installed formatter; the full check passes.
 5. **Keep runtime and documentation claims accurate.** Host PHP 8.4.1 cannot satisfy
    this root application's PHP 8.5 requirement. Use the existing PHP 8.5 container.
    Both lockfiles already exist and match installed dependencies; the earlier
    verification record's missing-lockfile claims have been replaced by this audit.
-6. **Plan missing domain/auth work without scaffolding again.** Starter metadata,
-   welcome copy, and default application name are still generic. Branding, auth,
+6. **Plan missing domain/auth work without scaffolding again.** Starter metadata
+   and welcome/PWA copy remain generic; the backend name default is `Mealplaner`. Branding, auth,
    ownership, domain schema, nutrition rules, CI, browser/PWA acceptance, and deployment
    remain scoped future work. `docs/NEW_PROJECT.md` is template-reuse reference, not
    an instruction to initialize another project inside Mealplaner.
 
-No architecture conflict was found. Test failures, environment differences, and
-missing MVP capabilities are documented limitations, not reasons to replace the starter.
+No architecture conflict was found. Host environment differences and missing MVP
+capabilities remain documented limitations, not reasons to replace the starter.

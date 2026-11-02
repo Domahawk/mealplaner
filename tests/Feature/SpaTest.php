@@ -30,9 +30,16 @@ class SpaTest extends TestCase
 
     public function test_static_and_framework_paths_are_not_caught_by_the_spa(): void
     {
-        foreach (['/build/missing.js', '/missing.css', '/storage/missing', '/icons/missing.png', '/sanctum/missing', '/_ignition/missing', '/up/missing'] as $path) {
+        foreach (['/build/missing.js', '/missing.css', '/icons/missing.png', '/sanctum/missing', '/_ignition/missing', '/up/missing'] as $path) {
             $this->get($path)->assertNotFound()->assertDontSee('<div id="app"></div>', false);
         }
+    }
+
+    public function test_private_storage_paths_require_a_signed_url_and_never_return_the_spa(): void
+    {
+        $this->get('/storage/missing')
+            ->assertForbidden()
+            ->assertDontSee('<div id="app"></div>', false);
     }
 
     public function test_post_requests_do_not_return_the_spa(): void

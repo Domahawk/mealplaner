@@ -4,7 +4,7 @@ export interface HealthResponse {
 }
 
 export async function checkHealth(): Promise<HealthResponse> {
-    const response = await fetch('/api/health', {
+    const response = await fetch('/api/ready', {
         headers: { Accept: 'application/json' },
         cache: 'no-store',
         signal: AbortSignal.timeout(8000),

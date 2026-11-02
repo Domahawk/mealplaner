@@ -13,7 +13,7 @@
     docker compose ps
     ```
 
-8. Open http://localhost:8000. Check navigation and theme switching, then click **Check server connection**. Visit http://localhost:8000/api/health for the JSON response. Edit `resources/js/views/WelcomeView.vue` to check HMR. Run the quality checks in the README and the PostgreSQL integration probe.
+8. Open http://localhost:8000. Check navigation and theme switching, then click **Check server connection**. Visit http://localhost:8000/api/health for API liveness or http://localhost:8000/api/ready for database connectivity. Edit `resources/js/views/WelcomeView.vue` to check HMR. Run the quality checks in the README and the PostgreSQL integration probe.
 9. Add your own database migrations under `database/migrations`, controllers under `app/Http/Controllers`, and API routes under `routes/api.php`. Run `docker compose exec backend php artisan migrate` when ready. Only framework cache tables are provided.
 10. Add Vue views under `resources/js/views` and routes in `resources/js/router/index.ts`. Reuse `resources/js/lib/api.ts` for ordinary same-origin requests. Register explicit Laravel web routes before the SPA route; reserve their namespace in both the Laravel route expression and Workbox navigation denylist.
 11. Replace the starter welcome copy when you begin your application. Keep API calls explicit until your product requires other behavior.

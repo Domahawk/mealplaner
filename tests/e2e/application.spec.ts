@@ -6,7 +6,7 @@ test('Laravel serves the SPA and the browser calls the same-origin API on demand
 }) => {
     let checks = 0;
     page.on('request', (request) => {
-        if (new URL(request.url()).pathname === '/api/health') checks++;
+        if (new URL(request.url()).pathname === '/api/ready') checks++;
     });
     const response = await page.goto('/');
     expect(response?.status()).toBe(200);

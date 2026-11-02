@@ -88,7 +88,7 @@ describe('starter application', () => {
         await wrapper.get('.primary-button').trigger('click');
         await flushPromises();
         expect(fetch).toHaveBeenCalledWith(
-            '/api/health',
+            '/api/ready',
             expect.objectContaining({ cache: 'no-store' }),
         );
         expect(wrapper.text()).toContain('All connected.');

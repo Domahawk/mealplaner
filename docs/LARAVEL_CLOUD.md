@@ -68,7 +68,7 @@ Commit both generated lockfiles in your application repository before deployment
 
 ## Verification after a future deployment
 
-- Check `/up` for liveness and `/api/health` for the actual managed database query. The latter returns only connectivity status and a safe 503 on failure.
+- Check `/up` and `/api/health` for application/API liveness. Check `/api/ready` for the actual managed database query; readiness returns only connectivity status and a safe 503 on failure.
 - Open `/`, click the connection button, navigate to `/about`, and reload it directly. Laravel must return the entry template on client routes; unknown `/api/*` routes must remain JSON 404s.
 - Inspect asset URLs: they must be relative to this application under `/build/`. No request should reference `localhost`, `frontend`, `backend`, port 5173, or a Docker network hostname.
 - Check `/build/manifest.webmanifest`, all three icons, and `/sw.js`. The worker is served by an explicit Laravel route with JavaScript content type, no-store caching, and root scope. Blade references the build manifest only when the Vite hot file is absent.

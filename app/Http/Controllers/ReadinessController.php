@@ -6,7 +6,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Throwable;
 
-class HealthController extends Controller
+class ReadinessController extends Controller
 {
     public function __invoke(): JsonResponse
     {

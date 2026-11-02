@@ -1,4 +1,64 @@
-# Verification record — starter architecture audit
+# Verification record
+
+## TASK-02 — Laravel backend stabilization (2026-11-02)
+
+The existing root Laravel application was extended without framework/dependency
+installation, upgrades, authentication changes, database configuration changes,
+migrations/resets, or Docker/service restarts. The already-running development
+containers were reused. Laravel remains **13.39.0**, on **PHP 8.5.12**.
+
+- `GET /api/health` is public, returns exactly `{"status":"ok"}` with HTTP 200 and
+  `Content-Type: application/json`, and makes no database query.
+- The previous database probe is retained as `GET /api/ready` in the renamed
+  `ReadinessController`; connection success and sanitized 503 failures are unchanged.
+  The existing Vue connection-check URL, label, tests, and PostgreSQL probe reference
+  were updated to readiness. The PostgreSQL probe itself was not run.
+- `/up`, SPA/web routing, middleware/session/CSRF behavior, and signed storage routes
+  are preserved. The two existing smoke-test mismatches are corrected using explicit
+  binary-file and signed-storage assertions, retaining coverage.
+- `APP_NAME=Mealplaner` is set in the example and Laravel fallback. The existing
+  local override, publicly visible as `MealPlaner`, was preserved. No actual local
+  environment file was opened or overwritten, and no application key was rotated.
+  Existing stack/single logging, file sessions/cache, synchronous queues, and
+  PostgreSQL settings were verified through nonsecret runtime metadata and preserved.
+
+Commands ran from the root application using the existing container command prefixes
+listed in the README. Host PHP/dependency limitations remain as recorded below.
+
+| Check                                        | Current result                                                                         |
+| -------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `php artisan --version`                      | Passed: Laravel 13.39.0.                                                               |
+| `php artisan route:list -v`                  | Passed: seven entries; health/readiness use standard API middleware and `/api` prefix. |
+| `composer validate --strict`                 | Passed; no manifest/lockfile changes.                                                  |
+| `composer check-platform-reqs`               | Passed with PHP 8.5.12.                                                                |
+| `php artisan test`                           | Passed: **15 tests, 76 assertions**, including production assets; no skipped tests.    |
+| `./vendor/bin/pint --test`                   | Passed: 29 files. Existing formatting issues corrected without disabling rules.        |
+| `./vendor/bin/phpstan analyse --no-progress` | Passed at configured level 8; no errors.                                               |
+| `npm run test`                               | Passed: 10 component/router/connectivity tests.                                        |
+| `npm run type-check` / `npm run lint`        | Passed.                                                                                |
+| `npm run build` / `npm run verify:build`     | Passed with the updated readiness URL.                                                 |
+
+The new database-independence regression was run before the route change and failed
+with HTTP 503, reproducing the old behavior. It now passes with
+`database.default=unconfigured`, without PostgreSQL or database writes. Existing
+readiness tests use isolated SQLite and a synthetic failure to verify safe errors.
+
+Actual HTTP requests through existing Nginx at `127.0.0.1:8000` returned:
+
+- `/api/health`: **200**, `application/json`, exact body `{"status":"ok"}`.
+- `/api/ready`: **200**, `application/json`, body
+  `{"status":"ok","database":"connected"}`.
+- `/up` and `/about`: **200**.
+
+Both API responses retain no-store caching. Browser/PWA/HMR tests and the database
+recreation probe were not run. No duplicate applications, infrastructure, dependencies,
+Git commits, or pushes were introduced. Future PostgreSQL domain schema and persistence
+acceptance remain separate work; readiness is connectivity only.
+
+## TASK-01 — historical audit baseline
+
+The record below describes the audit before TASK-02. Its two backend test failures
+and two formatting issues are now resolved; it is retained to explain their causes.
 
 Audited on **2026-11-02**. This record supersedes the earlier sandbox-only verification
 record: both lockfiles now exist, dependencies are installed in Compose named volumes,

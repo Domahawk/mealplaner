@@ -25,7 +25,7 @@ const connection = useConnectionStore();
         </div>
         <p class="connection-message" role="status" aria-live="polite">{{ connection.message }}</p>
         <div class="connection-footer">
-            <span class="endpoint"><span aria-hidden="true">↗</span> GET /api/health</span>
+            <span class="endpoint"><span aria-hidden="true">↗</span> GET /api/ready</span>
             <button
                 class="primary-button"
                 type="button"
