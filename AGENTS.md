@@ -94,6 +94,9 @@ task scope, inspect existing work, and preserve unrelated changes.
   The guarded PostgreSQL suite receives a fresh database and restricted login from
   `scripts/verify-postgres.php`; never pass development credentials to that suite or
   bypass `tests/bootstrap.php`. Never fall back to a development database.
+- Database-writing verification must boot the guarded testing environment with its
+  restricted credentials before Laravel starts. Switching a named connection inside
+  an application already booted with development credentials is insufficient isolation.
 - Never reset the development database. Do not run `migrate:fresh`, database resets,
   destructive SQL, or database-volume removal against development or production data.
   Run migrations only when the task authorizes them, after confirming the target.

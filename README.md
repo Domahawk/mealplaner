@@ -30,8 +30,8 @@ Planned MVP capabilities, **not yet implemented**:
 There are no user/domain models or domain migrations yet. PostgreSQL 18.6
 connectivity, existing migration compatibility, and committed-record persistence
 across reconnects are verified in an isolated test database. Development migration
-history remains uninitialized and untouched. Broader Docker recovery and Mealplaner
-workflows remain separate work; see [database.md](docs/database.md).
+history remains uninitialized and untouched. Docker lifecycle verification is recorded in [VERIFICATION.md](docs/VERIFICATION.md);
+Mealplaner domain workflows remain future work. See [database.md](docs/database.md).
 
 ## Detected stack
 
@@ -112,7 +112,9 @@ builds, and frontend testing conventions.
 ## Local setup and development
 
 The existing setup uses Docker Engine with Compose v2, Git, and default loopback
-ports 8000 and 5173. No host PHP/Node installation is required for this workflow.
+ports 8000 and 5173. No host PHP, Composer, Node/npm, or PostgreSQL installation is required. Runtime
+images are pinned to compatible versions and immutable digests. Fedora bind mounts
+use shared SELinux labels and generated files use the configured host UID/GID.
 For a checkout that has no local environment file, create it once:
 
 ```bash
@@ -122,7 +124,7 @@ test -f .env || cp .env.example .env
 Supply local database credentials privately in the ignored environment. Preserve any
 existing environment and application key. Keep the example's file-session/file-cache
 and synchronous-queue settings until persistence requirements are deliberately changed.
-Set local UID/GID appropriately for host ownership. `APP_NAME` remains configurable;
+Set `LOCAL_UID`/`LOCAL_GID` to `id -u` / `id -g` before building for host ownership. `APP_NAME` remains configurable;
 existing local overrides are preserved rather than overwritten. The current public
 name override is `MealPlaner`, while the example/default spelling is `Mealplaner`.
 Logging uses the existing stack/single-file channel under `storage/logs/laravel.log`;
@@ -137,9 +139,11 @@ docker compose ps
 ```
 
 The existing entrypoints install locked dependencies into named volumes when needed
-and initialize only an empty application key. They never run migrations. Startup is
-not an audit command: this audit reused already-running containers and installed nothing.
-See [DEVELOPMENT.md](docs/DEVELOPMENT.md) for the existing detailed workflow.
+and initialize only an empty application key. They never run migrations. Startup fails if a tracked lockfile or the prepared `.env` is missing.
+The full [fresh-clone workflow](docs/DEVELOPMENT.md#docker-setup-from-a-fresh-clone)
+covers readiness, private configuration, dependency installation, conditional key
+initialization, database inspection, safe migration decisions, and testing.
+For readiness waiting, add `--wait --wait-timeout 300` to `up`.
 
 | Default URL                        | Purpose                                                                                                       |
 | ---------------------------------- | ------------------------------------------------------------------------------------------------------------- |
@@ -189,17 +193,21 @@ PostgreSQL runner provisions a fresh database and restricted login, verifies exi
 migrations and commit/reconnect persistence, and removes only those test resources.
 It no longer recreates PostgreSQL. `pdo_pgsql` is required and available.
 
-The existing development database and local environment remain unchanged. Its
-`migrate:status` reports no migration repository; initialization was not authorized
-merely because it has no tables. `.env.example` now uses nonsecret Mealplaner database
+TASK-04 preserved the development database and local environment. During TASK-05,
+an initial verification probe mistakenly created two empty cache tables; targeted
+cleanup is awaiting approval. No existing records were changed or deleted. See the
+[incident record](docs/VERIFICATION.md#verification-incident--cleanup-awaiting-approval)
+before any development schema work. Migration history remains uninitialized. `.env.example` now uses nonsecret Mealplaner database
 placeholders with a blank password. Keep `DB_HOST=postgres` inside the existing Compose
 network; use `127.0.0.1` only for an appropriate host-reachable database. The current
 container does not publish a database port. See [database.md](docs/database.md) for
 variables, permissions, safe migrations, isolation, and persistence limits.
 
 `/api/ready` remains the database probe; `/api/health` is database-independent.
-Docker restart/recreation recovery remains for TASK-05. Development browser/HMR
-checks passed in TASK-03; production offline/update/device installation remains
+TASK-05 also passes **25 backend tests / 101 assertions**, all existing PHP/frontend
+quality checks, the production build, and **3 development browser checks**. It verifies Docker startup and restart/recreation persistence using an isolated
+restricted-role test database on the existing volume. See the verification record for
+the initial probe issue and cleanup status. Development browser/HMR checks are rerun; production offline/update/device installation remains
 separate verification work.
 
 `npm run dev` starts Vite; `npm run format` modifies files and should be used only
@@ -214,9 +222,9 @@ setup, and its HMR test temporarily edits source. Do not remove database volumes
 - [Verification record](docs/VERIFICATION.md): current stabilization results and the
   historical architecture-audit baseline.
 - [Database guide](docs/database.md): PostgreSQL requirements, safe migration workflow,
-  restricted integration testing, reconnect persistence, and TASK-05 limits.
-- [Development guide](docs/DEVELOPMENT.md): containers, HMR, persistence, and existing
-  verification procedures; inspect operations before executing them.
+  restricted integration testing, and persistence verification bounds.
+- [Development guide](docs/DEVELOPMENT.md): Docker-only fresh setup, pinned runtimes,
+  commands, HMR, safe persistence, backup, Fedora/SELinux, and troubleshooting.
 - [Laravel Cloud guide](docs/LARAVEL_CLOUD.md): future single-application deployment
   reference, not an executed deployment. Review provider and secret-handling steps
   against AGENTS.md before any deployment task.

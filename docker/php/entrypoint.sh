@@ -8,10 +8,17 @@ chown app:app vendor /tmp/composer-cache
 chown -R app:app storage bootstrap/cache
 
 if [ "$1" = "php-fpm" ]; then
-    fingerprint=$(cat composer.json composer.lock 2>/dev/null | sha256sum | cut -d ' ' -f 1)
+    if [ ! -f composer.lock ]; then
+        echo 'composer.lock is required. Restore the tracked lockfile before starting.' >&2
+        exit 1
+    fi
+    if [ -f vendor/.starter-dependencies ]; then
+        chown app:app vendor/.starter-dependencies
+    fi
+    fingerprint=$(cat composer.json composer.lock | sha256sum | cut -d ' ' -f 1)
     if [ ! -f vendor/autoload.php ] || [ ! -f vendor/.starter-dependencies ] || [ "$(cat vendor/.starter-dependencies)" != "$fingerprint" ]; then
         gosu app composer install --no-interaction --prefer-dist
-        cat composer.json composer.lock | sha256sum | cut -d ' ' -f 1 > vendor/.starter-dependencies
+        printf '%s' "$fingerprint" | gosu app tee vendor/.starter-dependencies > /dev/null
     fi
     gosu app php scripts/ensure-app-key.php
     exec "$@"

@@ -21,7 +21,9 @@ class ApplicationKeyTest extends TestCase
 
     protected function tearDown(): void
     {
-        unlink($this->directory.'/.env');
+        if (is_file($this->directory.'/.env')) {
+            unlink($this->directory.'/.env');
+        }
         unlink($this->directory.'/scripts/ensure-app-key.php');
         unlink($this->directory.'/vendor');
         rmdir($this->directory.'/scripts');
@@ -48,6 +50,16 @@ class ApplicationKeyTest extends TestCase
         file_put_contents($this->directory.'/.env', $contents);
         $this->initializeKey();
         $this->assertSame($contents, file_get_contents($this->directory.'/.env'));
+    }
+
+    public function test_missing_environment_is_rejected_without_creating_an_incomplete_file(): void
+    {
+        $process = new Process([PHP_BINARY, $this->directory.'/scripts/ensure-app-key.php']);
+        $process->run();
+
+        $this->assertFalse($process->isSuccessful());
+        $this->assertStringContainsString('Prepare .env from .env.example', $process->getErrorOutput());
+        $this->assertFileDoesNotExist($this->directory.'/.env');
     }
 
     private function initializeKey(): void

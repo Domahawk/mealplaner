@@ -3,7 +3,12 @@
 require __DIR__.'/../vendor/autoload.php';
 
 $path = __DIR__.'/../.env';
-$handle = fopen($path, 'c+');
+if (! is_file($path)) {
+    fwrite(STDERR, "Prepare .env from .env.example before starting the application.\n");
+    exit(1);
+}
+
+$handle = fopen($path, 'r+');
 
 if ($handle === false || ! flock($handle, LOCK_EX)) {
     throw new RuntimeException('Cannot lock .env. Check project file ownership.');

@@ -51,80 +51,189 @@ production-offline browser branch was not run in development mode. See
 [VERIFICATION.md](VERIFICATION.md) for results, the temporary host-Chrome testing
 method, and existing dependency advisories. No additional dependencies were introduced.
 
-## Containers
+## Docker setup from a fresh clone
 
-| Service  | Responsibility                 | Host ports     | Persistent data         |
-| -------- | ------------------------------ | -------------- | ----------------------- |
-| backend  | PHP 8.5 FPM, Composer, Laravel | None           | vendor, Composer cache  |
-| frontend | Node 24, npm, Vite             | 127.0.0.1:5173 | node_modules, npm cache |
-| postgres | PostgreSQL 18                  | None           | postgres_data           |
-| nginx    | Static files and Laravel HTTP  | 127.0.0.1:8000 | None                    |
+**Current checkout warning:** the initial TASK-05 verification probe created two empty
+development cache tables. Their targeted removal awaits approval. See the
+[incident record](VERIFICATION.md#verification-incident--cleanup-awaiting-approval)
+before any development schema changes. New-clone setup below does not authorize
+resetting an existing database.
 
-The project is bind-mounted into the application containers, so PHP changes need no rebuild. Shared mounts use SELinux `:z` labels. The database is available only on the Compose network. PHP starts after PostgreSQL is healthy; Vite starts after FPM's FastCGI ping succeeds; Nginx starts after Vite is ready. Startup failures stay visible through logs and health status.
+Docker Engine and Docker Compose v2 with `--wait` support are the only required host
+runtimes. PHP, Composer, Node/npm, and PostgreSQL run in containers. Use the root
+checkout throughout; do not create separate backend/frontend applications.
 
-The entrypoints compare dependency-file fingerprints to stamps in their named volumes. Changed Composer files trigger `composer install`; changed npm files trigger `npm ci`. The PHP entrypoint locks `.env`, reads the existing key, and only fills an empty key. It does not migrate the database. Do not share a development `.env` between projects.
+1. Prepare the ignored environment once, preserving any existing file:
+
+    ```bash
+    test -f .env || cp .env.example .env
+    id -u
+    id -g
+    ```
+
+2. Edit `.env` privately. Set a local `DB_PASSWORD` (the blank example deliberately
+   fails Compose validation), confirm the database/user and `DB_HOST=postgres`, and
+   set `LOCAL_UID`/`LOCAL_GID` to the host IDs above. Keep `APP_ENV=local`, file
+   sessions/cache, and synchronous queues. Leave a new `APP_KEY` blank; preserve an
+   existing key. Default URLs are `APP_URL=http://localhost:8000`, `APP_PORT=8000`,
+   `VITE_HMR_HOST=localhost`, and `VITE_PORT=5173`.
+3. Validate, build, and start the same application:
+
+    ```bash
+    docker compose config --quiet
+    docker compose up -d --build --wait --wait-timeout 300
+    docker compose ps
+    ```
+
+    Internet access is needed to pull images and initially install locked dependencies.
+    Entrypoints install missing/changed dependencies with `composer install` / `npm ci`
+    into named volumes. Both tracked lockfiles are required; startup never resolves a
+    replacement lockfile. Subsequent unchanged starts reuse installed dependencies.
+    PHP initializes only an empty application key, under a file lock, without printing
+    it. A missing `.env` fails rather than creating an incomplete configuration.
+    No startup command runs migrations, seeds, or resets.
+
+4. Check the database connection and inspect migration status:
+
+    ```bash
+    docker compose exec -T --user app backend php artisan --version
+    curl --fail http://localhost:8000/api/ready
+    docker compose exec -T --user app backend php artisan migrate:status
+    ```
+
+    `Migration table not found` means history is uninitialized, not that the connection
+    failed. **Only after confirming a new, empty, dedicated Mealplaner development
+    database is safe to initialize**, run reviewed pending migrations:
+
+    ```bash
+    docker compose exec -T --user app backend php artisan migrate --force
+    ```
+
+    For existing or uncertain data, stop at inspection; obtain authorization for schema
+    changes. Preserve its history. Never use reset/fresh/refresh/wipe commands.
+
+5. Open <http://localhost:8000>. Vite already runs automatically. Check `/up`,
+   `/api/health` (database-independent JSON), and `/api/ready` (database readiness).
+   Run the test/quality commands below. No host language runtime is needed.
+
+## Containers and networking
+
+| Service  | Pinned runtime                  | Host ports     | Named volumes           |
+| -------- | ------------------------------- | -------------- | ----------------------- |
+| backend  | PHP 8.5.12 FPM, Composer 2.10.3 | None           | vendor, composer_cache  |
+| frontend | Node 24.22.2, npm 11.19.1       | 127.0.0.1:5173 | node_modules, npm_cache |
+| postgres | PostgreSQL 18.6                 | None           | postgres_data           |
+| nginx    | Nginx 1.30.6                    | 127.0.0.1:8000 | None                    |
+
+Official image tags and immutable registry digests pin these compatible versions.
+PHP/Node use Debian Bookworm; PostgreSQL/Nginx use Alpine. Updates require deliberate
+pin changes, rebuilds, and verification; image pins do not replace security maintenance.
+Debian package repositories are not snapshot-pinned, so OS package patch versions may
+change on a clean rebuild. Preserve the dependency lockfiles.
+
+These are process roles for one Laravel release. Nginx serves `public/` and forwards
+PHP to FPM; Node serves this application's root Vite entry. No extra proxy, application,
+authentication layer, or API origin is introduced. PostgreSQL stays on the private
+Compose network. Browser URLs use `localhost`; PHP connects to `postgres:5432`, and
+Nginx connects to `backend:9000`. Never put those internal names in browser URLs.
+
+The source checkout is shared through bind mounts, so PHP changes require no image
+rebuild and Vue/CSS changes reach Vite immediately. `vendor`/`node_modules` and package
+caches use named volumes; `public/build` and `public/hot` stay in the shared checkout.
+Dependency volumes hide host directories by design: run tools in the containers.
+The Docker build context excludes environments, private storage, credentials/tool
+metadata, dependencies, builds, logs, and database dumps. Images contain runtime files,
+not application secrets. `VITE_*` variables are public and must never contain secrets.
+
+PostgreSQL readiness gates FPM, the FastCGI ping gates Vite, and Vite's HTTP check gates
+Nginx. Nginx also checks Laravel `/up`. Services restart unless stopped; PostgreSQL
+gets 30 seconds for graceful shutdown. Vite uses an init process for signal/child
+handling. Health checks do not mutate databases. Initial dependency installation may
+need longer readiness time on a slow network; inspect status/logs rather than resetting.
 
 ## Commands
 
 ```bash
-docker compose exec backend php artisan <command>
+docker compose up -d --build
+docker compose ps
+docker compose logs -f
+docker compose exec --user app backend php artisan <command>
 docker compose exec --user app backend composer <command>
 docker compose exec --user node frontend npm <command>
-docker compose exec --user node frontend npm run lint
-docker compose exec --user node frontend npm run format
-docker compose exec --user node frontend npm run format:check
-docker compose exec --user node frontend npm run type-check
-docker compose exec --user node frontend npm run test:unit
-docker compose exec backend php artisan test
-docker compose exec backend ./vendor/bin/pint --test
-docker compose exec backend ./vendor/bin/pint
-docker compose exec backend ./vendor/bin/phpstan analyse
+docker compose exec --user node frontend npm run <script>
+docker compose down
 ```
 
-Vite starts automatically through `npm run dev`. To restart it: `docker compose restart frontend`. For one-off npm commands when it is stopped, use `docker compose run --rm --no-deps frontend npm <command>`. Use `docker compose run --rm --no-deps backend composer <command>` for Composer without FPM.
+Logs can contain application data; do not share unreviewed output or dump resolved
+configuration. `config --quiet` validates without exposing credentials. `down` preserves
+named volumes; never add volume-removal flags. There are no destructive cleanup wrappers.
 
-## Hot reload
+All development tool commands explicitly use the mapped non-root user. A root
+entrypoint prepares only project writable directories and dependency/cache mount roots;
+FPM's master keeps its normal root privilege and workers run as `app`. Vite/npm and
+Composer run as `node`/`app`. Dependency stamps are also owned by those users. Rebuild
+images after Dockerfile or UID/GID changes; recreate services after Compose environment
+or port changes. Plain `restart` does not apply changed Compose settings.
 
-Open Laravel at port 8000. Laravel's official Vite plugin writes `public/hot`, and Blade uses it to load assets from port 5173. Vue SFCs and imported CSS update through Vite's HMR connection.
-
-`APP_URL` must match the URL in your browser for the Vite CORS allowlist. `VITE_HMR_HOST` is the browser-visible host, normally `localhost`; it must never be `frontend`. `VITE_PORT` configures both published and container ports. If `APP_PORT` changes, update `APP_URL` too. Restart Vite after editing environment variables. Production has no dependency on these development-only Vite settings.
-
-Polling is enabled for reliable bind-mount watching. Set `VITE_USE_POLLING=false` to try native events, or increase `VITE_POLL_INTERVAL` to reduce CPU use. Both services bind their public ports to loopback. Sharing a development server requires intentional port and CORS changes.
-
-## Migrations and isolation
-
-Start with status inspection; this does not initialize the schema:
+For a stopped service, one-off commands reuse its volumes and mapped user:
 
 ```bash
-docker compose exec -T --user app backend php artisan migrate:status
-docker compose exec -T --user app backend php artisan test
-sh scripts/verify-postgres.sh
+docker compose run --rm --no-deps backend composer install
+docker compose run --rm --no-deps frontend npm ci
 ```
 
-The existing development database has no migration repository. TASK-04 preserved it
-rather than assuming an empty database was safe to initialize. Apply reviewed pending
-migrations only after confirming the target is new, empty, dedicated, and authorized;
-otherwise leave its data/history untouched. No migrations run at startup and no reset
-commands are part of verification.
+Do not run another `npm run dev` alongside the existing Vite service. After changing
+lockfiles, restart the affected service to synchronize dependencies. A manual `npm ci`
+removes the dependency stamp, so the next Vite startup will synchronize again.
 
-Default PHPUnit still forces SQLite memory storage and array drivers. Both test
-configurations use a guarded bootstrap that rejects cached/unsafe effective settings.
-The PostgreSQL runner creates a unique database and restricted login, supplies only
-those credentials to `phpunit.postgres.xml`, applies the existing migration, and tests
-committed-record persistence after a new connection. It cleans up only the resources
-it created. It does not restart/recreate PostgreSQL or modify development data.
+## Tests and quality checks
 
-`pdo_pgsql` is installed in the PHP container; PostgreSQL 18.6 was verified. The
-example now has a blank password and Mealplaner database/user placeholders; preserve
-actual `.env` settings and provide private local credentials when creating a new
-environment. `DB_HOST=postgres` is for the existing Compose network; host PostgreSQL
-normally uses `127.0.0.1`. No database port is currently published to the host.
+```bash
+docker compose exec -T --user app backend php artisan test
+sh scripts/verify-postgres.sh
+docker compose exec -T --user app backend composer validate --strict
+docker compose exec -T --user app backend composer check-platform-reqs
+docker compose exec -T --user app backend ./vendor/bin/pint --test
+docker compose exec -T --user app backend composer analyse
+docker compose exec -T --user node frontend npm run type-check
+docker compose exec -T --user node frontend npm run lint
+docker compose exec -T --user node frontend npm run format:check
+docker compose exec -T --user node frontend npm run test:unit
+docker compose exec -T --user node frontend npm run build
+docker compose exec -T --user node frontend npm run verify:build
+```
 
-See [database.md](database.md) for exact variables, permissions, initial inspection,
-test isolation, migration rules, verified reconnect persistence, and the remaining
-TASK-05 container-lifecycle checks. The PostgreSQL test runner requires uncached local
-configuration and permission to provision isolated roles/databases; it fails rather
-than changing existing permissions or falling back to development data.
+Default PHPUnit forces SQLite memory storage and array drivers. Its guarded bootstrap
+rejects cached/unsafe effective settings. The PostgreSQL runner creates a unique database
+and restricted login, supplies only those credentials to `phpunit.postgres.xml`, applies
+the existing migration, checks commit/reconnect persistence, and removes only its own
+resources. It never restarts services or modifies development tables. Do not invoke
+that XML manually with development credentials. The runner needs local provisioning
+permissions and fails safely if they are absent. Tools preserve nonzero exit status.
+See [database.md](database.md) for isolation and migration details.
+
+## Hot reload and environment changes
+
+Open Laravel at port 8000, not the Vite module server. Laravel's Vite plugin writes
+`public/hot`, and Blade loads development modules from port 5173. Vue SFCs and imported
+CSS update through HMR. PHP OPcache validates timestamps immediately in this dev image.
+
+`APP_URL` must match the browser origin for Vite's CORS allowlist. `VITE_HMR_HOST` is
+the browser-visible host, normally `localhost`, never `frontend`. `VITE_PORT` controls
+both published and container ports. If `APP_PORT` changes, update `APP_URL` too.
+After editing these settings, apply them with:
+
+```bash
+docker compose up -d --force-recreate frontend nginx
+```
+
+This preserves named volumes. Backend/database
+settings belong in the existing `.env`; do not overwrite keys or credentials.
+
+Polling supports bind-mount watching reliably. Set `VITE_USE_POLLING=false` to try native
+events, or increase `VITE_POLL_INTERVAL` from 300 milliseconds to reduce CPU use. All
+published ports bind loopback; sharing beyond this host requires intentional security,
+origin, and port configuration. Production uses compiled assets and does not need Vite.
 
 ## Browser integration checks
 
@@ -137,13 +246,21 @@ npx playwright install chromium
 TEST_MODE=development npm run test:e2e
 ```
 
-No host Node is needed for the application. For browser checks entirely in Docker, run a temporary browser-test container on the Compose network (this is a one-off test runner, not an application service):
+No host Node is needed for the application or unit checks. Browser automation additionally
+needs a Chromium installation and its OS libraries. On Linux, a temporary runner can
+share host networking so its browser reaches the usual localhost application/HMR URLs
+without changing `.env` (installations stay inside the disposable container):
 
 ```bash
-docker compose run --rm --no-deps --entrypoint sh --user root frontend -c 'export PLAYWRIGHT_BROWSERS_PATH=/tmp/starter-playwright; npx playwright install --with-deps chromium && gosu node env BASE_URL=http://nginx TEST_MODE=development npm run test:e2e'
+docker run --rm --init --network host --volumes-from "$(docker compose ps -q frontend)" --workdir /var/www/html --entrypoint sh mealplaner-frontend -c 'export PLAYWRIGHT_BROWSERS_PATH=/tmp/mealplaner-playwright; npx playwright install --with-deps chromium && chmod -R a+rX "$PLAYWRIGHT_BROWSERS_PATH" && gosu node env TEST_MODE=development npm run test:e2e'
 ```
 
-That browser needs to resolve the HMR hostname. For the Docker browser run, temporarily set `VITE_HMR_HOST=frontend` and `APP_URL=http://nginx` in `.env`, run `docker compose up -d --force-recreate frontend`, then run the tests. Restore both values afterward and recreate frontend again before browsing from Fedora. This is a test-only change; normally the host browser must use `localhost`.
+`mealplaner-frontend` is the default Compose-built image name; substitute the image
+for your project if you changed the Compose project name. This optional runner needs
+network access for browser downloads. It runs only the browser tests as the mapped
+user, shares source/dependencies for the HMR check, and does not create database
+services or change application credentials. Host networking is a Linux-only testing
+choice, separate from the isolated normal development stack.
 
 Alternatively use an existing compatible Chromium via `CHROMIUM_PATH=/path/to/chromium`. Downloading browsers needs network access. Real mobile installation and browser install prompts remain manual checks.
 
@@ -160,7 +277,7 @@ Vite removes `public/hot` on normal shutdown. If the container was killed and it
 
 Open http://localhost:8000, reload, and inspect the network panel. JavaScript and CSS must come from `/build/assets/`, with no requests to port 5173. Deep-link to `/about`. Check `/build/manifest.webmanifest` and `/sw.js`; the root worker must have a JavaScript MIME type and scope `/`.
 
-For a Docker browser production run, use the browser-test command above with `TEST_MODE=production PWA_TEST_ORIGIN=http://nginx`; production assets use only relative same-origin URLs, so no HMR hostname override is needed. `PWA_TEST_ORIGIN` adds a Chromium test-only secure-origin exception for the internal HTTP hostname. Real installation uses localhost or production HTTPS. With host Node: `TEST_MODE=production npm run test:e2e`.
+For a Docker browser production run, use the temporary host-network runner above with `TEST_MODE=production`. Stop Vite first so Laravel uses the built assets. Localhost is a browser secure context; production installation requires HTTPS. With host Node: `TEST_MODE=production npm run test:e2e`.
 
 The PWA plugin runs only during a production build. The app registers `/sw.js` through the browser API only when `import.meta.env.PROD` is true. The plugin cannot discover Blade as a Vite HTML entry, so `offlineShell` emits `public/build/offline.html` from the compiled entry and CSS. Workbox precaches it, hashed assets, and content-revisioned icons. Navigation uses that static shell; API and framework namespaces, dotted static URLs, and non-GET requests are excluded. No API caching, IndexedDB, background sync, or polling is configured.
 
@@ -171,6 +288,15 @@ To test an update, keep a production tab open, edit welcome copy, rebuild, and r
 Before returning to HMR, unregister this project's service worker in browser DevTools → Application → Service Workers (or use a fresh browser profile). Then run `docker compose up -d frontend`. A worker installed by a previous production smoke test can otherwise keep serving its cached production shell. Development itself never installs a worker.
 
 ## Backup and restore
+
+Keep the checkout directory/Compose project name stable: it selects the existing named
+volumes. PostgreSQL 18 stores data under `/var/lib/postgresql/18/docker`, covered by
+`postgres_data:/var/lib/postgresql`. Ordinary restarts/recreation and `docker compose
+down` preserve it. Changing database environment values does **not** change users or
+passwords inside an initialized volume; mismatches require deliberate administration,
+not volume deletion. Never change the PostgreSQL major against an existing data volume.
+Named-volume durability is not a backup: keep private dumps outside Git and test restore
+into a fresh database before relying on recovery. No backup restore has been verified.
 
 Back up the development database:
 
@@ -200,6 +326,12 @@ docker compose exec --user root backend chown -R app:app vendor storage bootstra
 docker compose exec --user root frontend chown -R node:node node_modules /home/node/.npm
 ```
 
+If a required port is occupied, choose `APP_PORT`/`VITE_PORT`, update `APP_URL`, and
+recreate the affected services. If startup fails, use `docker compose ps` and private
+service logs; check the first dependency failure, network access, lockfiles, and disk
+space. `unhealthy` does not justify resetting data. For missing-table errors, inspect
+migration status and the selected file/session/cache settings before changing schema.
+
 If the backend cannot update `.env`, make that specific file writable by your host user. Do not use world-writable permissions or recursively change the ownership of unrelated directories. Dependency volumes intentionally hide vendor/node_modules from host tools; run checks through Compose.
 
 ## Updates
@@ -213,4 +345,4 @@ docker compose build --pull backend frontend
 docker compose pull postgres nginx
 ```
 
-Review and retain both lockfiles, run all quality checks, build and verify the PWA, and test startup after upgrades. Major PostgreSQL upgrades require a separate backup/migration procedure; never point a new incompatible major at an old data volume. Keep production runtimes compatible with `composer.json` and `package.json`.
+For runtime updates, review the official image version/digest and edit the relevant pins before building/pulling; `pull` alone intentionally retains the pinned image. Review and retain both lockfiles, run all quality checks, build and verify the PWA, and test startup after upgrades. Major PostgreSQL upgrades require a separate backup/migration procedure; never point a new incompatible major at an old data volume. Keep production runtimes compatible with `composer.json` and `package.json`.

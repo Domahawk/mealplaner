@@ -1,5 +1,73 @@
 # Verification record
 
+## TASK-05 — Docker development environment (2026-11-02)
+
+Reused the four existing services and the original `mealplaner_postgres_data` volume.
+No application, service, package, migration, database credential, or application key
+was replaced. PHP/Node Dockerfiles and PostgreSQL/Nginx references now pin verified
+official image tags plus immutable registry digests: PHP 8.5.12, Composer 2.10.3,
+Node 24.22.2/npm 11.19.1, PostgreSQL 18.6, and Nginx 1.30.6. The PHP extensions,
+FPM/Nginx integration, shared SELinux labels, dependency/cache volumes, and loopback
+ports remain in use. Vite gains an init process; PostgreSQL has a 30-second stop window.
+
+### Verification incident — cleanup awaiting approval
+
+The first temporary lifecycle probe booted Laravel with development credentials and
+attempted a migration on a separately named test connection. This did not isolate
+all schema operations: it mistakenly created **two empty development tables**, `cache`
+and `cache_locks`, with their primary-key indexes. Initial development inspection had
+zero user relations. Subsequent inspection confirmed both new tables contain zero
+rows and no migration repository was created in development. No existing record was
+modified or deleted. The failed probe's generated test database/login were removed.
+
+The probe was stopped and its unsafe temporary script removed. Approval was requested
+to restore the original development schema by removing only those two empty tables,
+after locking and rechecking them, without CASCADE or any reset command. **That
+cleanup has not run and remains pending approval.** Do not treat development migration
+initialization as safe while this discrepancy remains unresolved.
+
+The corrected probe provisioned a new random database and restricted login, then
+booted a separate process through `tests/bootstrap.php` with forced testing/array
+settings and only that login's credentials. It checked the actual database/user and
+restricted permissions before ordinary migrations or writes. No connection-switching
+inside a development-credential application was used for test writes. This requirement
+is now explicit in `AGENTS.md`.
+
+### Executed checks
+
+| Check                                            | Result                                                                                                                                                                                                                                               |
+| ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `docker compose config --quiet`                  | Passed without printing resolved credentials.                                                                                                                                                                                                        |
+| PHP/Node image builds                            | Passed with the pinned base images and existing lockfiles.                                                                                                                                                                                           |
+| `docker compose up -d --wait --wait-timeout 240` | Passed; all four services healthy, zero unexpected restarts.                                                                                                                                                                                         |
+| Empty dependency/source-copy startup             | Passed in an isolated temporary checkout with a synthetic environment and no database service. Composer installed locked dependencies; Vite ran after `npm ci`. The temporary source/container were removed; no database volume was created/deleted. |
+| Missing lockfiles                                | Both built entrypoints failed with nonzero status, without generating replacement lockfiles.                                                                                                                                                         |
+| Key and ownership                                | Fresh empty-key initialization passed; second startup preserved environment bytes/mtime and reused dependencies. Dependency stamps and Vite hot file belonged to host UID 1000. Actual checkout `.env` size/mtime remained unchanged.                |
+| Fedora/SELinux                                   | Host SELinux enforcing; shared `:z` mounts worked during startup, source watching, builds, and HMR.                                                                                                                                                  |
+| Laravel CLI/routes                               | Laravel 13.39.0; all seven existing routes registered.                                                                                                                                                                                               |
+| HTTP                                             | `/`, `/about`, unknown frontend route, `/up`, `/api/health`, `/api/ready`, and Vite `/@vite/client` returned 200; health/readiness returned their exact JSON contracts. Unknown API paths retained JSON 404 in browser tests.                        |
+| Backend tests                                    | **25 tests, 101 assertions**, including missing-environment rejection without creating a partial `.env`.                                                                                                                                             |
+| Restricted PostgreSQL tests                      | **3 tests, 49 assertions** after container recreation; temporary database/login removed.                                                                                                                                                             |
+| Pint / Composer / PHPStan                        | Passed: Pint 33 files, strict Composer validation, platform requirements, configured PHPStan/Larastan analysis.                                                                                                                                      |
+| Frontend tests/types/lint/format                 | **10 tests** passed; strict Vue TSC, ESLint, and Prettier passed.                                                                                                                                                                                    |
+| Production build/artifacts                       | Passed; type-checked Vite build and `verify:build`, including PWA/static assets.                                                                                                                                                                     |
+| Browser development suite                        | **3 passed, 1 production-only test skipped**. Installed Chrome verified Laravel/Vite integration, direct navigation/refresh, API readiness, and real Vue/CSS HMR without navigation. Source edits were restored.                                     |
+| Lifecycle persistence                            | Corrected restricted-role probe's committed cache record survived Laravel restart and PostgreSQL recreation. Container ID changed; PostgreSQL image and original named volume stayed the same. Only the probe's own database/login were removed.     |
+| Startup logs / image contents                    | No critical startup matches in current container logs. Runtime images contain no copied application/environment files.                                                                                                                               |
+
+Fresh-start checks used temporary containers/source with the same built images and
+existing package-cache volumes; they never connected to development PostgreSQL. Only
+Docker executed PHP, Composer, npm, tests, and builds. Browser verification used
+installed host Chrome with the locked Playwright tooling copied into a temporary
+runner; the optional all-Docker browser-download recipe was not executed.
+
+No database reset, development record deletion, volume removal, duplicate application,
+CI workflow, production deployment, Git commit, or push occurred. Existing privileged
+local database-role settings remain unchanged. Production offline/update/device PWA
+acceptance, host reboot, backup restore, volume-loss recovery, and unrelated locked
+development-tool advisories remain outside these verified claims. The development
+schema discrepancy above is an unresolved limitation until cleanup is approved.
+
 ## TASK-04 — PostgreSQL persistence (2026-11-02)
 
 Initial inspection is recorded in [database.md](database.md). The existing runtime

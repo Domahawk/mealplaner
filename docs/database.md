@@ -17,8 +17,8 @@ this task will not change that existing role or its credentials.
 
 PostgreSQL's data directory is `/var/lib/postgresql/18/docker`, within the existing
 writable named-volume mount at `/var/lib/postgresql`. `fsync` and
-`synchronous_commit` are both on. This is configuration evidence, not a claim that
-container recreation or backup recovery has been tested.
+`synchronous_commit` are both on. This was configuration evidence at TASK-04. TASK-05 separately verified container
+recreation on the same volume; backup recovery remains untested.
 
 The development database was not proven newly created/dedicated, so no pending
 migrations will be run there. All existing data, role settings, migration files,
@@ -51,8 +51,9 @@ Changing examples or fallbacks does not rename existing databases, users, or vol
 The existing database container does **not** publish port 5432 to the host. A host PHP
 process cannot reach that private service merely by setting `DB_HOST=127.0.0.1`.
 Use the existing PHP container for this setup; host PostgreSQL and any future host
-port mapping are separate runtime choices. TASK-05 can verify the existing Compose
-lifecycle without redesigning Laravel's environment-based connection.
+port mapping are separate runtime choices. TASK-05 preserves this private Compose network and Laravel's environment-based
+connection. The Docker-only setup and lifecycle results are in
+[DEVELOPMENT.md](DEVELOPMENT.md) and [VERIFICATION.md](VERIFICATION.md).
 
 ## Development database and migrations
 
@@ -62,8 +63,11 @@ Inspect the configured target privately and begin with the read-only status comm
 docker compose exec -T --user app backend php artisan migrate:status
 ```
 
-Current development result: **Migration table not found**. There are no user
-relations. This is reported as uninitialized migration history, not as a failed
+Development result: **Migration table not found**. TASK-04 found no user relations.
+The initial TASK-05 lifecycle probe mistakenly created two empty cache tables; their
+targeted removal awaits approval. See the
+[incident record](VERIFICATION.md#verification-incident--cleanup-awaiting-approval)
+before development schema work. This is reported as uninitialized migration history, not as a failed
 connection. The existing cache migration uses Laravel Schema Builder and passed on
 both SQLite and PostgreSQL; its bytes were not modified.
 
@@ -158,8 +162,11 @@ The configured named volume and durability settings were inspected, and ordinary
 connection/application-process lifetimes do not store records in memory. The tested
 claim is **commit/reconnect persistence on the existing PostgreSQL runtime**. No
 PostgreSQL restart, container recreation, host reboot, backup restore, or volume-loss
-recovery was performed. TASK-05 must verify the broader Docker lifecycle; do not label
-those recovery behaviors as passed based on this task.
+recovery was performed. TASK-05 separately verified a committed cache record in a fresh restricted-role test
+database across Laravel restart and ordinary PostgreSQL container recreation, retaining
+the same original volume and image. See [VERIFICATION.md](VERIFICATION.md) for that
+verification and its initial probe incident/cleanup status. Host reboot, volume loss,
+and backup recovery remain untested.
 
 The existing development role is privileged and was not altered. Plan least-privilege
 application/provisioning roles before deployment. Initial development migrations,

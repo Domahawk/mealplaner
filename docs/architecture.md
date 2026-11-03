@@ -169,11 +169,13 @@ and referenced products/recipes will need ownership checks before those features
 `config/database.php` defaults to PostgreSQL, with an explicitly separate in-memory
 SQLite connection for default tests. Only a framework cache/cache-lock migration
 and an empty seeder are present; TASK-04 preserved both unchanged. Existing
-PostgreSQL 18.6 connectivity and `pdo_pgsql` were verified. Development has no user
-relations or migration repository and was deliberately left untouched because it
-was not confirmed newly created/dedicated. The migration passed in a fresh restricted
-PostgreSQL test database, including commit/reconnect persistence. No reset or
-PostgreSQL restart was used. Broader container recovery remains for TASK-05.
+PostgreSQL 18.6 connectivity and `pdo_pgsql` were verified. At TASK-04, development had no user relations or migration repository and was
+deliberately left untouched because it was not confirmed newly created/dedicated. The migration passed in a fresh restricted
+PostgreSQL test database, including commit/reconnect persistence. TASK-04 used no reset or PostgreSQL restart. TASK-05 additionally checks ordinary
+container recreation on the original named volume using a restricted test identity;
+see [VERIFICATION.md](VERIFICATION.md) for its results and the initial probe incident.
+That initial probe created two empty development cache tables; targeted cleanup is
+awaiting approval. Existing migration history and records were not changed.
 `/api/health` remains operational without a database; `/api/ready` checks connectivity.
 See [database.md](database.md) for the full workflow and bounded verification results.
 
@@ -240,15 +242,18 @@ unchanged. The audit's two test-contract mismatches and two Pint issues are reso
 commands, historical diagnoses, and host/container distinctions in
 [VERIFICATION.md](VERIFICATION.md). TASK-04 subsequently passes 24 default tests
 (98 assertions), 3 PostgreSQL tests (49 assertions), all 10 frontend tests, Pint,
-and configured PHPStan analysis. Development relations remain unchanged and no
-generated test databases/roles remain after cleanup.
+and configured PHPStan analysis. After TASK-04, development relations were unchanged and no generated test
+databases/roles remained after cleanup. TASK-05 status, including its initial probe
+incident, is recorded separately in [VERIFICATION.md](VERIFICATION.md).
 
 ## Infrastructure and deployment
 
 Existing Compose services are `postgres`, `backend` (PHP-FPM/Composer), `frontend`
 (Node/Vite), and `nginx`. They use the same root checkout. Names are process roles,
-not application or service-domain boundaries. The four services were already running;
-the audit did not start, restart, recreate, or install anything.
+not application or service-domain boundaries. The initial audit reused four running
+services. TASK-05 preserves these service names, volumes, and architecture, pins the
+existing compatible runtime versions by image digest, rebuilds PHP/Node, and verifies
+startup and lifecycle behavior. [DEVELOPMENT.md](DEVELOPMENT.md) documents fresh setup.
 
 The database uses a named persistent volume and has no published host port. PHP and
 Node dependencies/cache use named volumes, explaining absent host dependencies. Source
@@ -256,8 +261,11 @@ bind mounts support development and use SELinux `:z`; UID/GID build arguments ma
 development ownership. Nginx publishes loopback port 8000 by default; Vite publishes
 5173 for modules/HMR only. Nginx's document root is `public/`, with PHP-FPM forwarding.
 
-Entrypoints install dependencies when fingerprints change and initialize an empty
-application key without replacing an existing key. Startup does not migrate. Their
+Entrypoints require both tracked lockfiles, install locked dependencies when their
+fingerprints change, and retain mapped-user ownership including dependency stamps.
+PHP requires a prepared `.env` and initializes only an empty application key without
+replacing an existing key. Startup does not migrate. PostgreSQL retains its existing
+volume name/path; Node uses an init process and PostgreSQL has a graceful-stop window. Their
 existence is not permission to run installation/startup during an audit.
 
 Production PWA support already exists: build-time offline shell generation, manifest,
