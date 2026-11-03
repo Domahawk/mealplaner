@@ -82,11 +82,17 @@ try {
     // These flags refer only to resources successfully created by this invocation.
     // Never force-disconnect other sessions or touch pre-existing databases/roles.
     try {
-        if ($databaseCreated) {
-            $admin->exec('DROP DATABASE '.$identifier);
-        }
-        if ($roleCreated) {
-            $admin->exec('DROP ROLE '.$identifier);
+        if ($databaseCreated || $roleCreated) {
+            if (! $admin instanceof PDO) {
+                throw new LogicException('Test-resource cleanup requires its administrative connection.');
+            }
+
+            if ($databaseCreated) {
+                $admin->exec('DROP DATABASE '.$identifier);
+            }
+            if ($roleCreated) {
+                $admin->exec('DROP ROLE '.$identifier);
+            }
         }
     } catch (Throwable) {
         fwrite(STDERR, "Cleanup of generated PostgreSQL test resources failed; no forced cleanup was attempted.\n");

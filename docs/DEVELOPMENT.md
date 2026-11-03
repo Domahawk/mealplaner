@@ -188,16 +188,19 @@ removes the dependency stamp, so the next Vite startup will synchronize again.
 
 ## Tests and quality checks
 
+Use `composer quality` for Pint/PHPStan/Larastan and `npm run quality` for
+ESLint/Prettier/Vue TSC. These gates check without fixing source and fail on errors;
+ESLint warnings also fail. Individual checks and deliberate formatting/fix commands
+are listed in [README.md](../README.md#code-quality). Run tools as the mapped users
+so their caches/generated files remain editable on the host.
+
 ```bash
 docker compose exec -T --user app backend php artisan test
 sh scripts/verify-postgres.sh
 docker compose exec -T --user app backend composer validate --strict
 docker compose exec -T --user app backend composer check-platform-reqs
-docker compose exec -T --user app backend ./vendor/bin/pint --test
-docker compose exec -T --user app backend composer analyse
-docker compose exec -T --user node frontend npm run type-check
-docker compose exec -T --user node frontend npm run lint
-docker compose exec -T --user node frontend npm run format:check
+docker compose exec -T --user app backend composer quality
+docker compose exec -T --user node frontend npm run quality
 docker compose exec -T --user node frontend npm run test:unit
 docker compose exec -T --user node frontend npm run build
 docker compose exec -T --user node frontend npm run verify:build

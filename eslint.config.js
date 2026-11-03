@@ -13,6 +13,8 @@ export default tseslint.config(
             'bootstrap/cache/**',
             'test-results/**',
             'playwright-report/**',
+            'coverage/**',
+            '.phpunit.cache/**',
         ],
     },
     js.configs.recommended,
@@ -20,6 +22,7 @@ export default tseslint.config(
     ...vue.configs['flat/recommended'],
     {
         files: ['**/*.vue'],
+        // Vue TSC checks identifiers, including TypeScript-only names in SFCs.
         rules: { 'no-undef': 'off' },
         languageOptions: { parserOptions: { parser: tseslint.parser } },
     },

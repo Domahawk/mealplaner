@@ -1,5 +1,56 @@
 # Verification record
 
+## TASK-06 — quality and static analysis (2026-11-03)
+
+Reused the installed Pint, PHPStan/Larastan, ESLint, Prettier, and Vue TSC versions
+without installing dependencies or changing either lockfile. The integrated Laravel/Vue
+architecture, Pint Laravel preset, strict TypeScript settings, test isolation, and
+mandatory type checking during the production build remain intact.
+
+Composer now provides `format`, `format:check`, and aggregate `quality`; existing
+`lint` remains a compatible check alias and `analyse` retains level 8 analysis with
+concise output. PHPStan coverage includes application code, both maintained bootstrap
+files, configuration, database migrations/seeders, routes, and PHP helper scripts.
+That expansion found two nullable administrative-PDO calls in test-resource cleanup;
+an explicit connection guard fixes them without a suppression or baseline. Cleanup
+still targets only resources successfully created by that test invocation.
+
+npm now provides aggregate `quality` and explicit `lint:fix`; `lint` treats warnings
+as failures. Existing formatting/type/build/test scripts remain compatible. Generated
+coverage and PHPUnit cache output are excluded from ESLint/Prettier. No application
+source exclusion or error suppression was added. README documents the command matrix,
+Docker invocation, tool coverage, and check/write distinctions; AGENTS requires the
+two quality gates and relevant tests/builds for future implementation tasks.
+
+All commands below ran in the existing Docker services as `app` / `node`:
+
+| Command                         | Result                                                                                                                                         |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `composer quality`              | Passed: Pint **33 PHP files** and expanded PHPStan/Larastan level 8 analysis, no errors.                                                       |
+| `composer lint`                 | Passed; existing check alias remains functional.                                                                                               |
+| `composer validate --strict`    | Passed; scripts-only manifest change needs no lockfile regeneration.                                                                           |
+| `composer check-platform-reqs`  | Passed with the installed PHP runtime/extensions.                                                                                              |
+| `npm run quality`               | Passed: zero-warning ESLint, non-mutating Prettier check, and strict Vue TSC.                                                                  |
+| `composer test`                 | **25 tests, 101 assertions**, using guarded SQLite memory storage.                                                                             |
+| `sh scripts/verify-postgres.sh` | **3 tests, 49 assertions**, using a generated restricted role/database; temporary resources removed. Docker executes the PHP runner and tests. |
+| `npm run test:unit`             | **10 tests** passed.                                                                                                                           |
+| `npm run build`                 | Passed; Vue TSC ran before Vite emitted the production/PWA assets.                                                                             |
+| `npm run verify:build`          | Passed; entry, CSS, offline shell, manifests, worker, and icons validated.                                                                     |
+
+Six controlled negative checks used temporary, unimported source files: PHP style,
+PHP return-type analysis, a Vue lint warning, frontend formatting, frontend typing,
+and build-blocking typing. Each expected diagnostic produced a nonzero exit without
+modifying its fixture or tracked source. A separate lint check confirmed the warning
+fixture had **zero errors and one warning** and still failed. All fixtures were
+removed in cleanup; no probe code was executed as application logic and no testing
+framework/dependency was added for these checks.
+
+No development schema/records, real local environment, infrastructure, application
+features, or authentication were modified. The TASK-05 cleanup request remains
+pending and was not carried out as part of TASK-06. No services were restarted, no
+volumes were removed, and no Git commit/push occurred. Git hooks/CI enforcement are
+not introduced by this task; the documented commands are ready for later automation.
+
 ## TASK-05 — Docker development environment (2026-11-02)
 
 Reused the four existing services and the original `mealplaner_postgres_data` volume.

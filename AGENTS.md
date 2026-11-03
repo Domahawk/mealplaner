@@ -83,6 +83,21 @@ task scope, inspect existing work, and preserve unrelated changes.
 - Run relevant tests, linters, formatters, static analysis, type checks, and builds.
   The verified command locations and known baseline failures are in `README.md` and
   `docs/VERIFICATION.md`.
+- For implementation tasks, run both standardized non-mutating quality gates from
+  the repository root through Docker before reporting completion:
+  `docker compose exec -T --user app backend composer quality` and
+  `docker compose exec -T --user node frontend npm run quality`.
+  The PHP gate runs Pint and PHPStan/Larastan; the frontend gate runs zero-warning
+  ESLint, Prettier checking, and strict Vue TSC. Preserve compatibility of the
+  individual scripts documented in `README.md`.
+- Run relevant automated tests with `composer test` in the `backend` service and
+  `npm run test:unit` in the `frontend` service; verify frontend changes with
+  `npm run build` and `npm run verify:build` in that service, using the mapped users above.
+  The build must retain type checking. Keep database tests isolated.
+- `composer format`, `npm run format`, and `npm run lint:fix` write files. Use them
+  deliberately, review the affected scope, then finish with non-mutating checks.
+  Quality failures must propagate nonzero status; do not allow warning-only success,
+  generate broad ignore baselines, or weaken rules to hide findings.
 - Investigate failures rather than suppressing them. Never weaken tests, broadly
   disable diagnostics, bypass platform requirements, or claim success for a command
   that did not complete successfully.

@@ -157,6 +157,58 @@ Vue Router handles `/`, `/about`, and unknown client routes without full reloads
 Laravel excludes API/framework/static namespaces from its SPA fallback. The existing
 local filesystem also registers signed GET/PUT `/storage/{path}` routes.
 
+## Code quality
+
+Run the standardized, non-mutating quality gates from the repository root using the
+existing containers and mapped users:
+
+```bash
+docker compose exec -T --user app backend composer quality
+docker compose exec -T --user node frontend npm run quality
+```
+
+Both commands fail with a nonzero exit status if any included check fails. They do
+not reformat or fix source files; tools may update ignored caches. No host PHP,
+Composer, or Node installation is required. Use the existing lockfiles and dev
+packages; no additional application or quality-tool installation is needed.
+
+| Capability                      | PHP: `composer <script>`                     | Frontend: `npm run <script>`                                 |
+| ------------------------------- | -------------------------------------------- | ------------------------------------------------------------ |
+| All quality checks              | `quality`: Pint check, then PHPStan/Larastan | `quality`: ESLint, Prettier check, then Vue TSC              |
+| Formatting check                | `format:check`: Pint Laravel preset          | `format:check`: Prettier                                     |
+| Lint                            | `lint`: compatible alias for `format:check`  | `lint`: ESLint, including Vue/TypeScript; warnings also fail |
+| Static analysis                 | `analyse`: PHPStan level 8 with Larastan     | `type-check`: strict TypeScript/Vue TSC                      |
+| Apply formatting (writes files) | `format`: Pint                               | `format`: Prettier                                           |
+| Apply lint fixes (writes files) | Use Pint's `format` for PHP style            | `lint:fix`: ESLint fixes; remaining warnings/errors fail     |
+
+PHPStan covers `app`, the two maintained bootstrap files, `config`, `database`,
+`routes`, and PHP `scripts`; it does not execute migrations or database verification
+scripts. Pint checks maintained PHP source with its Laravel preset. ESLint checks
+JavaScript, TypeScript, and Vue using the existing recommended flat configurations;
+Prettier handles supported frontend/configuration/documentation files, with PHP and
+Blade left to their existing conventions. Generated output, dependencies, runtime
+storage, and test coverage are excluded from frontend checks. Vue TSC retains strict
+checking, unchecked-index and exact-optional-property checks, and unused-symbol checks
+for application code, Vue components, TypeScript tests, and tool configuration.
+
+Formatting/lint-fix commands intentionally modify files: review their scope and the
+diff, then rerun both quality gates. Never add broad suppressions or generated ignore
+baselines just to pass a check. This task adds no CI workflow or Git hook.
+
+Tests and production builds remain separate checks:
+
+```bash
+docker compose exec -T --user app backend composer test
+docker compose exec -T --user node frontend npm run test:unit
+docker compose exec -T --user node frontend npm run build
+docker compose exec -T --user node frontend npm run verify:build
+```
+
+Backend tests use the guarded isolated SQLite memory configuration; none of these
+commands migrates or resets the development database. Build still includes mandatory
+Vue TSC checking. See [VERIFICATION.md](docs/VERIFICATION.md) for executed results and
+[DEVELOPMENT.md](docs/DEVELOPMENT.md) for container setup and optional integration tests.
+
 ## Verification commands and current results
 
 Run existing tools from the root application through running containers:
@@ -168,11 +220,8 @@ docker compose exec -T --user app backend composer validate --strict
 docker compose exec -T --user app backend composer check-platform-reqs
 docker compose exec -T --user app backend php artisan test
 sh scripts/verify-postgres.sh
-docker compose exec -T --user app backend ./vendor/bin/pint --test
-docker compose exec -T --user app backend ./vendor/bin/phpstan analyse --no-progress
-docker compose exec -T --user node frontend npm run type-check
-docker compose exec -T --user node frontend npm run lint
-docker compose exec -T --user node frontend npm run format:check
+docker compose exec -T --user app backend composer quality
+docker compose exec -T --user node frontend npm run quality
 docker compose exec -T --user node frontend npm run test:unit
 docker compose exec -T --user node frontend npm run build
 docker compose exec -T --user node frontend npm run verify:build

@@ -38,8 +38,14 @@
             "@php artisan package:discover --ansi"
         ],
         "test": "@php artisan test",
-        "lint": "pint --test",
-        "analyse": "phpstan analyse --memory-limit=512M"
+        "lint": "@format:check",
+        "format": "pint",
+        "format:check": "pint --test",
+        "analyse": "phpstan analyse --memory-limit=512M --no-progress",
+        "quality": [
+            "@format:check",
+            "@analyse"
+        ]
     },
     "config": {
         "optimize-autoloader": true,

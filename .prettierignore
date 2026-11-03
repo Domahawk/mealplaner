@@ -10,3 +10,5 @@ package-lock.json
 phpunit.xml
 test-results
 playwright-report
+coverage
+.phpunit.cache

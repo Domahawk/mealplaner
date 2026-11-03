@@ -225,8 +225,12 @@ shared storage rather than assuming current file sessions are sufficient.
   checks successfully with installed Chrome; the production-offline check was
   skipped in development mode. Additional browser checks covered keyboard use,
   themes, and desktop/tablet/mobile layout without altering backend routes.
-- Pint uses the Laravel preset. PHPStan/Larastan analyzes `app`, bootstrap, and routes
-  at level 8. ESLint, Prettier, strict Vue TSC, and a type-checked Vite build are configured.
+- Pint uses the Laravel preset. PHPStan/Larastan analyzes `app`, the maintained
+  bootstrap files, `config`, `database`, routes, and PHP helper scripts at level 8.
+  ESLint, Prettier, strict Vue TSC, and a type-checked Vite build are configured.
+  TASK-06 standardizes `composer quality` and `npm run quality` as non-mutating
+  gates; ESLint warnings also fail. Formatting/fix scripts remain explicit writes.
+  Existing tool versions/rules are reused without baselines or new dependencies.
 - `scripts/verify-build.mjs` verifies emitted assets, offline shell, root-absolute
   worker precache URLs, manifests, and PNG icons without a database.
 - `scripts/verify-postgres.sh` now runs a restricted-role PostgreSQL suite in a

@@ -5,6 +5,10 @@ parameters:
     paths:
         - app
         - bootstrap/app.php
+        - bootstrap/providers.php
+        - config
+        - database
         - routes
+        - scripts
     level: 8
     tmpDir: storage/framework/cache/phpstan
