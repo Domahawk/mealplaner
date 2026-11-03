@@ -6,7 +6,8 @@
         <testsuite name="Feature"><directory>tests/Feature</directory></testsuite>
         <testsuite name="Unit"><directory>tests/Unit</directory></testsuite>
     </testsuites>
-    <source><include><directory>app</directory></include></source>
+    <source><include><directory>app</directory><directory>routes</directory></include></source>
+    <logging><junit outputFile="test-results/backend-sqlite.xml"/></logging>
     <php>
         <env name="APP_ENV" value="testing" force="true"/>
         <env name="APP_DEBUG" value="false" force="true"/>

@@ -2,16 +2,17 @@
 
 namespace Tests\Feature;
 
+use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 class DatabaseTest extends TestCase
 {
-    public function test_existing_migrations_work_in_the_isolated_memory_database(): void
+    use DatabaseTransactions;
+
+    public function test_existing_migrations_work_in_the_isolated_database(): void
     {
-        $this->assertSame('sqlite', config('database.default'));
-        $this->assertSame(':memory:', config('database.connections.sqlite.database'));
         $this->artisan('migrate', ['--force' => true])->assertSuccessful();
 
         $this->assertTrue(Schema::hasTable('cache'));

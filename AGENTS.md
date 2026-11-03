@@ -105,10 +105,27 @@ task scope, inspect existing work, and preserve unrelated changes.
   failures without expanding into unrequested application changes. Distinguish passed,
   failed, blocked, and unexecuted checks explicitly.
 - Use isolated testing databases. Confirm the test environment and database before any
-  database-writing test. Default PHPUnit uses SQLite `:memory:` and array drivers.
-  The guarded PostgreSQL suite receives a fresh database and restricted login from
+  database-writing test. Canonical `composer test` runs all backend suites on a generated
+  PostgreSQL database; `composer test:sqlite` / direct Artisan tests retain SQLite
+  `:memory:`. Both force testing/array drivers. The PostgreSQL suite receives a fresh
+  database and restricted login from
   `scripts/verify-postgres.php`; never pass development credentials to that suite or
   bypass `tests/bootstrap.php`. Never fall back to a development database.
+- Extend the shared `Tests\TestCase` for Laravel tests. Its database/role checks must
+  run before transaction/migration traits. Use `DatabaseTransactions` for database
+  writes; the guarded base applies ordinary migrations to the generated test database.
+  Do not introduce `RefreshDatabase`, `DatabaseMigrations`, or resets incidentally.
+  Committed-record tests require narrowly targeted cleanup in their generated database.
+- Use `composer test:coverage` in the `backend` service and `npm run test:coverage`
+  in the `frontend` service for coverage verification. Preserve the app/routes and
+  TypeScript/Vue coverage scope, including uncovered executable files. Do not hide
+  gaps with exclusions or arbitrary lowered thresholds. Reports belong in ignored
+  `coverage/` and `test-results/`, never Git. PHP coverage requires the provided
+  development Xdebug extension; keep it off for ordinary runtime requests.
+- Keep Vitest and its V8 coverage provider compatible, tests non-interactive by default,
+  and failure/cleanup exit codes intact. Build frontend assets before the backend
+  production-asset test. Follow `docs/testing.md` for commands and isolation conventions;
+  never pass development credentials to test processes or invent parallel-worker setup.
 - Database-writing verification must boot the guarded testing environment with its
   restricted credentials before Laravel starts. Switching a named connection inside
   an application already booted with development credentials is insufficient isolation.

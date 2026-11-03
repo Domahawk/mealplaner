@@ -8,30 +8,6 @@ use Tests\TestCase;
 
 class DatabaseTest extends TestCase
 {
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        $database = config('database.connections.pgsql.database');
-        $this->assertTrue($this->app->environment('testing'));
-        $this->assertSame('pgsql', config('database.default'));
-        $this->assertIsString($database);
-        $this->assertMatchesRegularExpression('/^mealplaner_test_[a-f0-9]{16}$/', $database);
-        $this->assertSame($database, config('database.connections.pgsql.username'));
-        $this->assertEmpty(config('database.connections.pgsql.url'));
-
-        $identity = DB::selectOne('SELECT current_database() AS database, current_user AS role');
-        $this->assertSame($database, $identity->database);
-        $this->assertSame($database, $identity->role);
-        $permissions = DB::selectOne('SELECT r.rolsuper, r.rolcreatedb, r.rolcreaterole, d.datdba = r.oid AS owns_database FROM pg_roles r JOIN pg_database d ON d.datname = current_database() WHERE r.rolname = current_user');
-        $this->assertFalse($permissions->rolsuper);
-        $this->assertFalse($permissions->rolcreatedb);
-        $this->assertFalse($permissions->rolcreaterole);
-        $this->assertTrue($permissions->owns_database);
-
-        $this->artisan('migrate', ['--force' => true])->assertSuccessful();
-    }
-
     public function test_laravel_connects_to_its_isolated_postgres_database(): void
     {
         $this->assertSame('pgsql', DB::connection()->getDriverName());

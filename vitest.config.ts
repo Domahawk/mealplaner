@@ -9,5 +9,14 @@ export default defineConfig({
         setupFiles: ['tests/frontend/setup.ts'],
         restoreMocks: true,
         clearMocks: true,
+        reporters: ['default', 'junit'],
+        outputFile: { junit: 'test-results/frontend.xml' },
+        coverage: {
+            provider: 'v8',
+            include: ['resources/js/**/*.{ts,vue}'],
+            exclude: ['resources/js/**/*.d.ts'],
+            reportsDirectory: 'coverage/frontend',
+            reporter: ['text', 'html', 'lcov', 'json-summary'],
+        },
     },
 });

@@ -70,7 +70,7 @@ resources/css/app.css      Responsive application and theme styling
 resources/views/app.blade.php  Laravel-served HTML entry using @vite
 routes/{web,api,console}.php   HTTP, API, and console routes
 public/                    Web root, icons, generated public/build assets
-tests/{Feature,Unit}/       PHPUnit tests with isolated SQLite memory storage
+tests/{Feature,Unit,Postgres}/  PHPUnit suites; generated PostgreSQL database, optional SQLite
 tests/{frontend,e2e}/       Vitest and Playwright tests
 docker/{php,node,nginx}/    Existing local runtime configuration
 compose.yaml               PostgreSQL, PHP, Vite, and Nginx services
@@ -204,10 +204,47 @@ docker compose exec -T --user node frontend npm run build
 docker compose exec -T --user node frontend npm run verify:build
 ```
 
-Backend tests use the guarded isolated SQLite memory configuration; none of these
-commands migrates or resets the development database. Build still includes mandatory
+The canonical backend command provisions a fresh guarded PostgreSQL test database
+and restricted login. It never migrates or resets the development database; the
+optional `composer test:sqlite` retains memory-only checks. Build still includes mandatory
 Vue TSC checking. See [VERIFICATION.md](docs/VERIFICATION.md) for executed results and
 [DEVELOPMENT.md](docs/DEVELOPMENT.md) for container setup and optional integration tests.
+
+## Automated testing
+
+The full backend suite now runs on an isolated PostgreSQL database, using the existing
+PHPUnit setup. Vitest and Vue Test Utils test the integrated Vue components/application.
+Run unattended commands through the existing containers:
+
+```bash
+docker compose exec -T --user app backend composer test
+docker compose exec -T --user node frontend npm run test:unit
+docker compose exec -T --user app backend composer test:coverage
+docker compose exec -T --user node frontend npm run test:coverage
+```
+
+Build the frontend first with `npm run build` so the backend production-asset smoke
+test executes rather than reporting a skip. After updating this checkout, rebuild the
+PHP image for Xdebug and install changed locked npm dependencies through Docker;
+see [testing.md](docs/testing.md#setup-and-commands). No host language runtime is needed.
+
+Each canonical backend run creates a random database/login, boots guarded testing
+configuration, verifies the actual database identity/permissions before Laravel's
+transaction traits, applies ordinary migrations only to that new database, and removes
+only its own resources afterward. Database-writing tests use `DatabaseTransactions`;
+no database resets are used. `composer test:sqlite` remains available for fast isolated
+memory checks. Never run the PostgreSQL XML manually with development credentials.
+
+Coverage uses development-only Xdebug **3.5.3** (off unless requested) and the matching
+Vitest V8 provider **4.1.12**. PHP HTML/Clover reports appear under `coverage/php/`;
+frontend HTML/LCOV/summary reports under `coverage/frontend/`. JUnit files are written
+to `test-results/backend.xml`, `test-results/backend-sqlite.xml`, and
+`test-results/frontend.xml`. These generated artifacts are ignored by Git.
+
+The [testing guide](docs/testing.md) documents isolation, migrations, transaction
+conventions, report paths, and the serial GitHub Actions command sequence. Current
+results and coverage measurements are in [VERIFICATION.md](docs/VERIFICATION.md).
+No CI workflow or unrelated application feature is introduced here.
 
 ## Verification commands and current results
 
@@ -218,8 +255,7 @@ docker compose exec -T --user app backend php artisan --version
 docker compose exec -T --user app backend php artisan route:list -v
 docker compose exec -T --user app backend composer validate --strict
 docker compose exec -T --user app backend composer check-platform-reqs
-docker compose exec -T --user app backend php artisan test
-sh scripts/verify-postgres.sh
+docker compose exec -T --user app backend composer test
 docker compose exec -T --user app backend composer quality
 docker compose exec -T --user node frontend npm run quality
 docker compose exec -T --user node frontend npm run test:unit
@@ -268,6 +304,8 @@ setup, and its HMR test temporarily edits source. Do not remove database volumes
 - [AGENTS.md](AGENTS.md): permanent architecture, coding, verification, and safety rules.
 - [Architecture](docs/architecture.md): integration, routing, ownership direction,
   infrastructure, detected versions, decisions, and technical debt.
+- [Testing guide](docs/testing.md): canonical PostgreSQL tests, safe Laravel utilities,
+  component tests, coverage, JUnit artifacts, and unattended CI commands.
 - [Verification record](docs/VERIFICATION.md): current stabilization results and the
   historical architecture-audit baseline.
 - [Database guide](docs/database.md): PostgreSQL requirements, safe migration workflow,

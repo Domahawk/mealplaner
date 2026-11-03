@@ -1,5 +1,20 @@
 # PostgreSQL persistence
 
+## Current automated testing (TASK-07)
+
+`docker compose exec -T --user app backend composer test` is now the canonical full
+backend run on a generated PostgreSQL database. The existing provisioning runner
+runs Unit, Feature, and PostgreSQL suites, validates the actual identity/permissions
+before Laravel transaction traits, and cleans up only its newly created database/login.
+`DatabaseTransactions` supplies per-test rollback; no refresh/reset commands are used.
+`composer test:sqlite` retains fast memory-only tests. Coverage, artifact paths, CI
+commands, and detailed safeguards are documented in [testing.md](testing.md).
+
+The sections below retain the TASK-04 inspection/results. Their narrower integration
+suite and SQLite-default Composer command describe that historical state; the current
+commands above supersede it. The pending TASK-05 development-table cleanup remains
+separate and has not been performed by automated tests.
+
 ## Initial TASK-04 inspection — 2026-11-02
 
 Before any changes, the root application already used Laravel's native `pgsql`

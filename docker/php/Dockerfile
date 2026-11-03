@@ -7,6 +7,8 @@ ARG LOCAL_GID=1000
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git unzip gosu libpq-dev libicu-dev libzip-dev \
     && docker-php-ext-install -j"$(nproc)" pdo_pgsql intl zip bcmath pcntl \
+    && pecl install xdebug-3.5.3 \
+    && docker-php-ext-enable xdebug \
     && groupadd --gid "$LOCAL_GID" app \
     && useradd --uid "$LOCAL_UID" --gid app --create-home app \
     && rm -rf /var/lib/apt/lists/*

@@ -195,8 +195,7 @@ are listed in [README.md](../README.md#code-quality). Run tools as the mapped us
 so their caches/generated files remain editable on the host.
 
 ```bash
-docker compose exec -T --user app backend php artisan test
-sh scripts/verify-postgres.sh
+docker compose exec -T --user app backend composer test
 docker compose exec -T --user app backend composer validate --strict
 docker compose exec -T --user app backend composer check-platform-reqs
 docker compose exec -T --user app backend composer quality
@@ -206,14 +205,20 @@ docker compose exec -T --user node frontend npm run build
 docker compose exec -T --user node frontend npm run verify:build
 ```
 
-Default PHPUnit forces SQLite memory storage and array drivers. Its guarded bootstrap
-rejects cached/unsafe effective settings. The PostgreSQL runner creates a unique database
-and restricted login, supplies only those credentials to `phpunit.postgres.xml`, applies
-the existing migration, checks commit/reconnect persistence, and removes only its own
-resources. It never restarts services or modifies development tables. Do not invoke
-that XML manually with development credentials. The runner needs local provisioning
-permissions and fails safely if they are absent. Tools preserve nonzero exit status.
-See [database.md](database.md) for isolation and migration details.
+`composer test` runs the complete backend suite in a freshly generated PostgreSQL
+database with a restricted login. The guarded base checks the effective server
+identity before transaction traits, migrates only that new database, and uses
+`DatabaseTransactions` for writing tests. The runner removes only its own resources,
+including after failures. `composer test:sqlite` preserves the optional memory suite;
+no development migration/reset is part of testing.
+
+Coverage commands are `composer test:coverage` and `npm run test:coverage` through the
+same services/users. Rebuild the PHP image for Xdebug 3.5.3; it stays off except in the
+coverage child. Install the locked frontend dependencies after pulling coverage changes.
+HTML/XML/LCOV output is under ignored `coverage/`; JUnit reports are in `test-results/`.
+See [testing.md](testing.md) for exact commands, guard ordering, conventions, artifact
+paths, and a non-interactive GitHub Actions sequence. See [database.md](database.md)
+for development migration rules. The pending TASK-05 cleanup remains separate.
 
 ## Hot reload and environment changes
 

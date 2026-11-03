@@ -37,7 +37,10 @@
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
             "@php artisan package:discover --ansi"
         ],
-        "test": "@php artisan test",
+        "test": "@test:postgres",
+        "test:postgres": "@php scripts/verify-postgres.php",
+        "test:sqlite": "@php artisan test",
+        "test:coverage": "@php scripts/verify-postgres.php --coverage",
         "lint": "@format:check",
         "format": "pint",
         "format:check": "pint --test",

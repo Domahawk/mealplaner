@@ -1,5 +1,64 @@
 # Verification record
 
+## TASK-07 — automated testing infrastructure (2026-11-03)
+
+The existing PHPUnit 12, Vitest 4.1.12, Vue Test Utils, guarded PostgreSQL provisioner,
+and Docker services were reused. No application framework, model, migration, database
+service, or authentication implementation was added. The only new npm development
+package is the matching `@vitest/coverage-v8` 4.1.12 provider and its locked transitive
+dependencies. The PHP development image now includes pinned Xdebug 3.5.3, off by
+default; coverage enables it only in the PHPUnit child. Composer dependencies and
+`composer.lock` are unchanged.
+
+`composer test` / `test:postgres` now run **Unit, Feature, and PostgreSQL** suites in
+one fresh generated database with a restricted login. `test:sqlite` preserves the
+optional SQLite suite. `test:coverage` adds PHP HTML/Clover reporting; frontend
+`test:coverage` adds V8 HTML/LCOV/summary reporting. Both configurations write JUnit
+results for later GitHub Actions artifact collection. No workflow was introduced.
+
+The shared Laravel test base validates the effective/actual database, matching role,
+ownership, and restricted privileges before Laravel transaction traits. Ordinary
+migrations run once for that generated database. Database-writing tests use native
+`DatabaseTransactions`, with two cases reusing one key to prove teardown rollback.
+A regression re-enters trait setup after changing to an unsafe synthetic connection
+and verifies rejection before a database could be opened. Bootstrap regressions now
+also reject unsupported drivers and missing PostgreSQL test passwords. No reset or
+fresh/refresh/wipe command was run anywhere.
+
+Baseline additions cover the health endpoint's JSON 405 for writes, continued liveness
+after readiness failure, accessible theme-button state, and theme switching when
+browser storage is blocked. Existing route/SPA/PWA-asset, component/router/store,
+key-initialization, real PostgreSQL readiness, migration, and reconnect tests remain.
+
+| Executed check                           | Result                                                                                                                                                                                                               |
+| ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PHP image build and backend activation   | Passed; Xdebug 3.5.3 loads with mode off for normal commands. PostgreSQL and its existing volume were not restarted/recreated.                                                                                       |
+| `composer test`                          | **34 tests, 420 assertions**, full suite on generated PostgreSQL; temporary database/login removed.                                                                                                                  |
+| `composer test:coverage`                 | **34 tests, 420 assertions**; HTML and Clover generated. **96.77% lines (30/31)** in `app` and `routes`.                                                                                                             |
+| `composer test:sqlite -- --compact`      | **29 tests, 191 assertions**, memory-only compatibility suite.                                                                                                                                                       |
+| `npm run test:coverage`                  | **12 tests** passed; JUnit, HTML, LCOV, and summary emitted. **81.44% lines**, 80.37% statements, 81.51% branches, 77.77% functions across application TypeScript/Vue.                                               |
+| `composer quality` / `npm run quality`   | Passed: Pint, PHPStan/Larastan, ESLint, Prettier, and strict Vue TSC.                                                                                                                                                |
+| `composer validate --strict`             | Passed; no Composer lockfile regeneration needed.                                                                                                                                                                    |
+| `npm run build` / `npm run verify:build` | Passed; type-checked production build and artifact checks.                                                                                                                                                           |
+| Actual HTTP/service checks               | `/`, `/about`, `/up`, `/api/health`, `/api/ready`, and Vite client returned 200; all four services healthy.                                                                                                          |
+| Controlled failing backend test          | Nonzero status propagated; generated database/role counts returned to their original values. Only the temporary probe file was removed, then the real suite was rerun successfully to restore passing JUnit results. |
+
+Both normal test commands also passed with `CI=true` and no TTY. Report XML/JSON
+files were parsed and HTML/LCOV files verified to exist, be nonempty, and belong to
+the mapped host user. Reports are under ignored `coverage/` and `test-results/`, not committed.
+Frontend coverage intentionally includes the untested entry point and partially
+covered production PWA composable; no exclusions or percentage gates hide those gaps.
+
+[testing.md](testing.md) documents setup, exact commands, transaction/cleanup rules,
+coverage scope, report paths, and the serial CI command sequence. README, development,
+database, architecture, and AGENTS instructions now distinguish canonical PostgreSQL
+runs from optional direct-Artisan/SQLite runs. Parallel PHPUnit workers are not configured.
+The production service-worker/device browser checks were not rerun for this task.
+
+No development or production schema/records, credentials, local environment file,
+application key, or existing database volume was changed or removed. The outstanding
+TASK-05 cleanup was not performed. No Git commit or push occurred.
+
 ## TASK-06 — quality and static analysis (2026-11-03)
 
 Reused the installed Pint, PHPStan/Larastan, ESLint, Prettier, and Vue TSC versions

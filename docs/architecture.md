@@ -202,22 +202,23 @@ shared storage rather than assuming current file sessions are sufficient.
 
 ## Testing and quality architecture
 
-- PHPUnit covers database-independent public health, isolated SQLite readiness,
+- PHPUnit covers database-independent public health, isolated PostgreSQL/SQLite readiness,
   safe readiness errors, liveness, SPA/API
   route boundaries, production assets, and key-initializer behavior using temporary
   synthetic environment files. Runtime tests check required PHP extensions.
 - `phpunit.xml` forces testing mode, SQLite memory storage, an empty database URL,
-  and array session/cache/mail drivers. No database refresh/reset traits are used.
+  and array session/cache/mail drivers for the optional SQLite suite. Database-writing
+  tests use Laravel `DatabaseTransactions`; no refresh/reset traits are used.
   A shared bootstrap now rejects cached configuration, unsafe databases/URLs, and
   inherited local settings before Laravel boots. The PostgreSQL suite additionally
   checks the actual generated database, matching role, ownership, and restricted
   permissions before running ordinary migrations. Test credentials are ephemeral
   and separate from development; no test environment file is created.
 - Vitest uses JSDOM and Vue Test Utils with real route definitions, fresh Pinia,
-  memory history, a matchMedia stub, and mocked HTTP responses. Ten tests cover
+  memory history, a matchMedia stub, and mocked HTTP responses. Twelve tests cover
   Mealplaner title/welcome/development notice, startup without requests, routing,
   document titles/main focus, theme behavior, loading, connectivity, retries, and
-  invalid responses. The `matchMedia` fixture now implements its complete typed
+  invalid responses, accessible theme state, and unavailable browser storage. The `matchMedia` fixture now implements its complete typed
   interface instead of asserting through `unknown`.
 - Playwright tests exist for live HTTP/browser integration, development asset loading,
   production offline behavior, and HMR. The HMR test temporarily rewrites Vue/CSS
@@ -230,14 +231,23 @@ shared storage rather than assuming current file sessions are sufficient.
   ESLint, Prettier, strict Vue TSC, and a type-checked Vite build are configured.
   TASK-06 standardizes `composer quality` and `npm run quality` as non-mutating
   gates; ESLint warnings also fail. Formatting/fix scripts remain explicit writes.
-  Existing tool versions/rules are reused without baselines or new dependencies.
+  TASK-06 reused those tool versions/rules without baselines or new dependencies.
 - `scripts/verify-build.mjs` verifies emitted assets, offline shell, root-absolute
   worker precache URLs, manifests, and PNG icons without a database.
-- `scripts/verify-postgres.sh` now runs a restricted-role PostgreSQL suite in a
+- `scripts/verify-postgres.sh` runs the same full backend suite as `composer test` in a
   fresh per-run database, verifies migrations and a committed record across a new
   connection, and removes only its own resources. The former container-recreation
-  step is removed. TASK-04 executed it successfully without modifying development
-  tables or restarting the existing service.
+  step is removed. TASK-04 originally verified the narrower suite; TASK-07 runs Unit,
+  Feature, and PostgreSQL suites with identity checks before Laravel traits, ordinary
+  migrations, rollback tests, and failure-safe cleanup. SQLite remains optional.
+
+TASK-07 makes generated PostgreSQL testing the canonical `composer test` workflow.
+The shared test base validates server identity/privileges before transaction traits;
+ordinary migrations run only for that generated database. PHP coverage uses the
+provided Xdebug 3.5.3 extension (off by default); Vue/TypeScript coverage uses the
+matching Vitest V8 provider 4.1.12. Both emit HTML and CI coverage formats plus JUnit
+results, with no production/application architecture change. Commands, scope, and
+safety conventions are documented in [testing.md](testing.md).
 
 TASK-03 verification passes: 15 backend tests with 76 assertions, 10 frontend
 tests, Pint, strict type/lint/format checks, production build/artifact checks, and

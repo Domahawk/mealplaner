@@ -17,7 +17,7 @@ class HealthTest extends TestCase
 
     public function test_isolated_test_database_connects(): void
     {
-        $this->assertSame('sqlite', DB::connection()->getDriverName());
+        $this->assertContains(DB::connection()->getDriverName(), ['sqlite', 'pgsql']);
         $this->assertNotEmpty(DB::select('SELECT 1'));
     }
 
@@ -37,6 +37,12 @@ class HealthTest extends TestCase
         $this->get('/api/health')
             ->assertOk()
             ->assertExactJson(['status' => 'ok']);
+    }
+
+    public function test_health_rejects_writes_with_a_json_method_error(): void
+    {
+        $this->postJson('/api/health')->assertStatus(405)
+            ->assertHeader('Content-Type', 'application/json');
     }
 
     public function test_readiness_checks_an_actual_query(): void
@@ -64,5 +70,8 @@ class HealthTest extends TestCase
             ])
             ->assertDontSee('private-password')
             ->assertDontSee('private-host');
+
+        $this->getJson('/api/health')->assertOk()->assertExactJson(['status' => 'ok']);
+        $this->get('/up')->assertOk();
     }
 }

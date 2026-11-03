@@ -58,12 +58,19 @@ class DatabaseIsolationTest extends TestCase
             'non-testing environment' => [['APP_ENV' => 'local']],
             'file-backed SQLite' => [['DB_DATABASE' => '/tmp/not-a-test-database.sqlite']],
             'database URL override' => [['DB_URL' => 'sqlite:///tmp/not-a-test-database.sqlite']],
+            'unsupported database driver' => [['DB_CONNECTION' => 'mysql']],
             'ordinary PostgreSQL database' => [['DB_CONNECTION' => 'pgsql', 'DB_DATABASE' => 'not-a-test-database']],
             'wrong PostgreSQL role' => [[
                 'DB_CONNECTION' => 'pgsql',
                 'DB_DATABASE' => 'mealplaner_test_0123456789abcdef',
                 'DB_USERNAME' => 'not-a-test-role',
                 'DB_PASSWORD' => 'synthetic-test-only',
+            ]],
+            'missing PostgreSQL password' => [[
+                'DB_CONNECTION' => 'pgsql',
+                'DB_DATABASE' => 'mealplaner_test_0123456789abcdef',
+                'DB_USERNAME' => 'mealplaner_test_0123456789abcdef',
+                'DB_PASSWORD' => '',
             ]],
         ];
     }

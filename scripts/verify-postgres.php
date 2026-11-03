@@ -6,6 +6,17 @@ use Symfony\Component\Process\Process;
 
 require __DIR__.'/../vendor/autoload.php';
 
+$arguments = array_slice($_SERVER['argv'], 1);
+if ($arguments !== [] && $arguments !== ['--coverage']) {
+    fwrite(STDERR, "Usage: php scripts/verify-postgres.php [--coverage]\n");
+    exit(1);
+}
+$coverage = $arguments === ['--coverage'];
+if ($coverage && ! extension_loaded('xdebug')) {
+    fwrite(STDERR, "PHP coverage requires Xdebug. Rebuild the backend development image.\n");
+    exit(1);
+}
+
 if (is_file(__DIR__.'/../bootstrap/cache/config.php')
     || ! empty($_SERVER['APP_CONFIG_CACHE'])
     || ! empty($_ENV['APP_CONFIG_CACHE'])
@@ -48,12 +59,25 @@ try {
     $databaseCreated = true;
     $admin->exec('REVOKE ALL ON DATABASE '.$identifier.' FROM PUBLIC');
 
-    $process = new Process([
+    $command = [
         PHP_BINARY,
         base_path('vendor/bin/phpunit'),
         '--configuration',
         base_path('phpunit.postgres.xml'),
-    ], base_path(), [
+        '--colors=never',
+        '--fail-on-warning',
+        '--fail-on-risky',
+    ];
+    if ($coverage) {
+        array_push($command,
+            '--coverage-clover', base_path('coverage/php/clover.xml'),
+            '--coverage-html', base_path('coverage/php/html'),
+            '--coverage-text',
+        );
+    }
+
+    $process = new Process($command, base_path(), [
+        'XDEBUG_MODE' => $coverage ? 'coverage' : 'off',
         'APP_ENV' => 'testing',
         'APP_DEBUG' => 'false',
         'APP_KEY' => false,
@@ -70,7 +94,7 @@ try {
         'DB_PASSWORD' => $password,
         'DB_SSLMODE' => $configuration['sslmode'],
     ]);
-    $process->setTimeout(120);
+    $process->setTimeout(180);
     $exitCode = $process->run();
     echo str_replace($password, '[redacted]', $process->getOutput());
     fwrite(STDERR, str_replace($password, '[redacted]', $process->getErrorOutput()));
@@ -101,7 +125,7 @@ try {
 }
 
 if ($exitCode === 0) {
-    echo "Isolated PostgreSQL migrations, restricted-role tests, and reconnect persistence passed; temporary resources removed.\n";
+    echo "Isolated PostgreSQL backend suite passed; temporary database and role removed.\n";
 }
 
 exit($exitCode);
