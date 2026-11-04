@@ -53,8 +53,9 @@ method, and existing dependency advisories. No additional dependencies were intr
 
 ## Docker setup from a fresh clone
 
-**Current checkout warning:** the initial TASK-05 verification probe created two empty
-development cache tables. Their targeted removal awaits approval. See the
+**Existing development database warning:** the initial TASK-05 verification probe
+created two empty cache tables in the original development database; a new clone with
+new volumes does not inherit that state. Their targeted removal awaits approval. See the
 [incident record](VERIFICATION.md#verification-incident--cleanup-awaiting-approval)
 before any development schema changes. New-clone setup below does not authorize
 resetting an existing database.
@@ -184,7 +185,17 @@ docker compose run --rm --no-deps frontend npm ci
 
 Do not run another `npm run dev` alongside the existing Vite service. After changing
 lockfiles, restart the affected service to synchronize dependencies. A manual `npm ci`
-removes the dependency stamp, so the next Vite startup will synchronize again.
+removes the dependency stamp and optimizer cache. If it runs while Vite is active,
+restart the frontend service before browsing again:
+
+```bash
+docker compose restart frontend
+docker compose up -d --no-deps --wait frontend
+```
+
+Otherwise cached dependency URLs can return 504 **Outdated Optimize Dep** and leave
+a blank page. Normal fresh startup installs dependencies before launching Vite; no
+extra manual `npm ci` is required. The next startup synchronizes the dependency stamp.
 
 ## Tests and quality checks
 
@@ -341,6 +352,16 @@ space. `unhealthy` does not justify resetting data. For missing-table errors, in
 migration status and the selected file/session/cache settings before changing schema.
 
 If the backend cannot update `.env`, make that specific file writable by your host user. Do not use world-writable permissions or recursively change the ownership of unrelated directories. Dependency volumes intentionally hide vendor/node_modules from host tools; run checks through Compose.
+
+## Foundation and CI verification
+
+The [CI guide](ci.md) describes the implemented push/PR workflow and exact checks.
+[VERIFICATION.md](VERIFICATION.md) records a clean local clone with five new volumes,
+all four services, locked dependency installation, quality/tests/builds, real browser
+HMR, and a committed record surviving Laravel restart and PostgreSQL recreation.
+Only the dedicated verification record was removed. The temporary stack was stopped
+without volume deletion; the original development stack/database were not used.
+The hosted GitHub run is still unverified and the original TASK-05 cleanup is pending.
 
 ## Updates
 

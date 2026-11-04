@@ -9,6 +9,11 @@ TypeScript under `resources/js`, a Blade HTML entry, and Laravel's Vite plugin.
 The browser uses same-origin REST endpoints. Production is one application deployment;
 Node/Vite provide development assets and build the frontend bundle.
 
+**CI status:** [Project Foundation CI](.github/workflows/ci.yml) is configured for
+pushes, pull requests, and manual runs. A passing GitHub-hosted run has **not yet been
+verified**; this checkout has no GitHub remote. See [CI status and troubleshooting](docs/ci.md).
+Local foundation verification is recorded in [VERIFICATION.md](docs/VERIFICATION.md).
+
 ## Current capabilities and MVP scope
 
 The integrated frontend now displays the Mealplaner header, Home welcome message,
@@ -244,7 +249,8 @@ to `test-results/backend.xml`, `test-results/backend-sqlite.xml`, and
 The [testing guide](docs/testing.md) documents isolation, migrations, transaction
 conventions, report paths, and the serial GitHub Actions command sequence. Current
 results and coverage measurements are in [VERIFICATION.md](docs/VERIFICATION.md).
-No CI workflow or unrelated application feature is introduced here.
+The [CI workflow](.github/workflows/ci.yml) reuses these checks; no deployment or
+unrelated application feature is introduced.
 
 ## Verification commands and current results
 
@@ -304,6 +310,8 @@ setup, and its HMR test temporarily edits source. Do not remove database volumes
 - [AGENTS.md](AGENTS.md): permanent architecture, coding, verification, and safety rules.
 - [Architecture](docs/architecture.md): integration, routing, ownership direction,
   infrastructure, detected versions, decisions, and technical debt.
+- [CI guide](docs/ci.md): workflow triggers, isolation, runtimes, caching, reports,
+  local reproduction, hosted-status limits, and troubleshooting.
 - [Testing guide](docs/testing.md): canonical PostgreSQL tests, safe Laravel utilities,
   component tests, coverage, JUnit artifacts, and unattended CI commands.
 - [Verification record](docs/VERIFICATION.md): current stabilization results and the

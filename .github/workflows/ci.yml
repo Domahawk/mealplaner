@@ -1,0 +1,134 @@
+name: Project Foundation CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Verify foundation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      CI: 'true'
+      APP_NAME: Mealplaner
+      APP_ENV: local
+      APP_DEBUG: 'false'
+      APP_URL: http://localhost
+      # Synthetic test key, identical to PHPUnit's fixture; never a deployment key.
+      APP_KEY: base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+      DB_CONNECTION: pgsql
+      DB_HOST: 127.0.0.1
+      DB_DATABASE: mealplaner_ci
+      DB_USERNAME: mealplaner_ci
+      # Public, job-scoped fixture credential for this disposable service only.
+      DB_PASSWORD: ${{ github.run_id }}-${{ github.run_attempt }}-ci
+      DB_URL: ''
+      CACHE_STORE: file
+      SESSION_DRIVER: file
+      QUEUE_CONNECTION: sync
+      MAIL_MAILER: array
+
+    services:
+      postgres:
+        image: postgres:18.6-alpine@sha256:10a5c69a83035ab5239f5620d708520e8b28f5aa1f2b20143e6024532edadfb5
+        env:
+          POSTGRES_DB: mealplaner_ci
+          POSTGRES_USER: mealplaner_ci
+          POSTGRES_PASSWORD: ${{ github.run_id }}-${{ github.run_attempt }}-ci
+        ports:
+          - 5432/tcp
+        options: >-
+          --health-cmd "pg_isready --username=mealplaner_ci --dbname=mealplaner_ci"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
+        with:
+          php-version: '8.5'
+          tools: composer:2.10.3
+          extensions: dom, xml, xmlwriter, mbstring, pdo_pgsql, pdo_sqlite, intl, zip, bcmath, pcntl
+          coverage: xdebug
+          ini-values: xdebug.mode=off
+
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Configure the service port
+        env:
+          POSTGRES_PORT: ${{ job.services.postgres.ports['5432'] }}
+        run: |
+          test -n "$POSTGRES_PORT"
+          printf 'DB_PORT=%s\n' "$POSTGRES_PORT" >> "$GITHUB_ENV"
+
+      - name: Locate Composer download cache
+        id: composer-cache
+        run: |
+          cache_dir="$(composer config cache-files-dir)"
+          printf 'dir=%s\n' "$cache_dir" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Composer downloads
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-php-8.5-composer-${{ hashFiles('composer.lock') }}
+          restore-keys: ${{ runner.os }}-php-8.5-composer-
+
+      - name: Install locked dependencies
+        run: |
+          composer validate --strict
+          composer install --no-interaction --prefer-dist --no-progress
+          composer check-platform-reqs
+          npm ci --no-audit --no-fund
+
+      - name: PHP quality
+        run: composer quality
+
+      - name: Frontend quality
+        run: npm run quality
+
+      - name: Build and verify production assets
+        run: |
+          npm run build
+          npm run verify:build
+
+      - name: Backend tests and coverage
+        run: composer test:coverage
+
+      - name: Frontend tests and coverage
+        run: npm run test:coverage
+
+      - name: Upload test and coverage reports
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: foundation-reports
+          path: |
+            test-results/
+            coverage/
+          if-no-files-found: warn
+          retention-days: 7

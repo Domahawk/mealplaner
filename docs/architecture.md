@@ -290,7 +290,10 @@ store is configured. Build artifacts passed validation; actual offline/update/br
 installation behavior was not tested by this audit.
 
 `docs/LARAVEL_CLOUD.md` describes a future single-application deployment rooted here.
-There is no verified cloud deployment or CI workflow in this checkout. Provider-specific
+There is no verified cloud deployment. TASK-08 adds `.github/workflows/ci.yml` for
+push/PR checks on the same root application, with PHP 8.5, Node 24, isolated PostgreSQL,
+lockfile installs/caches, existing scripts, and report upload. Its first hosted run
+is unverified because this checkout has no GitHub remote; see [ci.md](ci.md). Provider-specific
 instructions must be reviewed at deployment time, especially secret-handling steps:
 the permanent instructions forbid displaying keys or inspecting credential values.
 Development Compose configuration is not the production deployment contract.

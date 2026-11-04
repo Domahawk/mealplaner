@@ -12,10 +12,11 @@ frontend dependencies as needed:
 
 ```bash
 docker compose up -d --build --wait --wait-timeout 300
-docker compose exec -T --user node frontend npm ci --no-audit --no-fund
 ```
 
-Fresh startup installs missing dependencies automatically. Preserve an existing `.env`
+Startup installs missing/changed locked dependencies automatically. If you explicitly
+run `npm ci` while Vite is running, restart `frontend` afterward to discard stale
+optimizer state; see [DEVELOPMENT.md](DEVELOPMENT.md#commands). Preserve an existing `.env`
 and key. The existing PostgreSQL connection must work, configuration must be uncached,
 and the local provisioning role must be permitted to create an isolated database/login.
 The Compose environment uses `APP_ENV=local`; the test runner forces `APP_ENV=testing`
@@ -131,10 +132,12 @@ Git-ignored and excluded from image build contexts/quality scans. Coverage conta
 source code: treat uploaded artifacts according to repository visibility. Do not commit
 reports or put secrets in fixtures.
 
-## GitHub Actions preparation
+## GitHub Actions and local reproduction
 
-No workflow is introduced here. After preparing the existing Docker environment,
-a serial unattended check can use:
+The implemented [workflow](../.github/workflows/ci.yml) runs these scripts on pushes,
+pull requests, and manual dispatch. Native GitHub execution remains unverified;
+[ci.md](ci.md) documents the isolated service, caching, action pins, and hosted status.
+After preparing the existing Docker environment, reproduce its checks with:
 
 ```bash
 docker compose exec -T --user node frontend npm run quality
@@ -148,7 +151,7 @@ docker compose exec -T --user node frontend npm run test:coverage
 Keep command exit statuses intact. The PostgreSQL runner fails on PHPUnit warnings/risky tests; Vitest run
 returns failures, and the database runner propagates the child status and cleanup
 failures. Upload `test-results/*.xml`, `coverage/php/`, and `coverage/frontend/` as
-artifacts in the later CI task. Normal `composer test` / `npm run test:unit` omit coverage
+artifacts; the workflow uploads them as `foundation-reports`. Normal `composer test` / `npm run test:unit` omit coverage
 collection when reports are unnecessary. This recipe uses existing dev-only services;
 production deployment configuration remains separate.
 

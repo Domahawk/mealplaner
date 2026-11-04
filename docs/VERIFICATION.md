@@ -1,5 +1,105 @@
 # Verification record
 
+## TASK-08 — CI and foundation verification (2026-11-03)
+
+**Overall status: locally verified; GitHub-hosted execution unverified. BL-01 is not
+marked complete.** No GitHub remote is configured in this checkout and no authenticated
+GitHub integration/CLI is available. The workflow has not been committed/pushed or
+observed running on GitHub. The independent TASK-05 development-table cleanup also
+remains pending explicit approval.
+
+Added `.github/workflows/ci.yml`, a single Ubuntu 24.04 job for pushes, pull requests,
+and manual dispatch. It selects PHP 8.5/Composer 2.10.3 and Node 24, provisions an
+isolated PostgreSQL 18.6 service with a job-scoped synthetic bootstrap credential,
+installs from both lockfiles, caches only dependency downloads, runs the existing
+quality/build/coverage scripts, and uploads JUnit/coverage artifacts. Action releases
+were resolved against their official GitHub metadata and pinned to commit SHAs.
+No development/production credentials, deployment steps, ignored failures, or weaker
+quality rules were introduced.
+
+### Actual local checks
+
+- **Workflow validation:** checksum-verified actionlint **1.7.12** passed. Each Bash
+  run block passed `bash -n`; all action SHAs matched official release commits.
+  An initial numeric dynamic-port key was corrected to the string key
+  `job.services.postgres.ports['5432']` after actionlint caught its type mismatch.
+- **Cold local checkout:** cloned the existing local Git repository into a private
+  temporary directory and included the uncommitted workflow for validation. No ignored
+  environment or dependency directories were copied. A synthetic private environment,
+  unique Compose project, and five previously absent named volumes were used.
+- **Docker startup:** the existing configuration built/started all four services
+  successfully with fresh dependency/database volumes. Entrypoints installed locked
+  Composer/npm dependencies and initialized only the new checkout's empty key.
+- **SELinux boundary:** this TASK-08 host reports **Disabled**. Shared `:z` mounts
+  remain configured, and no host policy was changed. Enforcing-mode operation was
+  not reverified in this run; the earlier TASK-05 enforcing result is historical.
+- **Migration setup:** verified the new database had zero non-system relations and
+  no migration repository, then applied ordinary pending migrations only to that
+  confirmed-new verification database. The existing development schema was not used.
+- **Declared CI commands:** extracted the install, quality, build, and coverage run
+  commands from the workflow and executed them through the new project's Docker
+  services with `CI=true`. Strict Composer validation, `composer install`, platform
+  checks, `npm ci`, both quality gates, build/artifact validation, and both coverage
+  suites passed. This executes the same scripts; it does not emulate hosted actions,
+  cache restoration, event delivery, or artifact upload.
+- **Backend:** **34 tests, 420 assertions**, generated restricted-role PostgreSQL
+  database, no failed tests; temporary test database/login removed. PHP coverage
+  remained **96.77% lines (30/31)**, with HTML/Clover reports.
+- **Frontend:** **12 tests** passed; **81.44% line coverage**. JUnit, HTML, LCOV, and
+  JSON reports were generated and checked. Report XML contained no failures/errors.
+- **HTTP:** `/`, `/about`, `/up`, `/api/health`, `/api/ready`, and the Vite client
+  returned 200, with the exact health/readiness JSON contracts.
+- **Browser/HMR:** **3 development tests passed, 1 production-only case skipped**.
+  Real Chrome verified rendering, navigation/refresh, same-origin readiness, Vue
+  template HMR, and CSS HMR without a full navigation. Edits were restored in the
+  verification checkout; application source in the working checkout was untouched.
+- **Persistence:** inserted one dedicated cache probe in the confirmed-new verification
+  database. Its committed value survived Laravel restart and ordinary PostgreSQL
+  container recreation. The container ID changed while the image and named volume
+  stayed the same. Only that exact probe key/value was deleted afterward. No reset,
+  table drop, truncation, or volume deletion was used for this check.
+- **Production browser:** **2 tests passed, 2 development-only cases skipped** after
+  stopping only the verification Vite service. Production assets, root worker delivery,
+  precaching, offline route reopening, and connectivity failure feedback passed.
+- **Fail-fast behavior:** the declared frontend quality command returned nonzero for
+  a controlled temporary type error. Its fixture was removed and the clean gate
+  passed again. Static workflow review confirms explicit Bash failure handling and
+  no `continue-on-error`/exit-status bypass; hosted failure behavior remains unobserved.
+- **Final working checkout:** both mandated Docker quality gates passed with the new
+  workflow and documentation. Dependency lockfiles and application code are unchanged.
+
+The first browser attempt encountered Vite **504 Outdated Optimize Dep** because
+verification explicitly ran `npm ci` underneath a running Vite process. Restarting
+Vite in the same isolated project fixed it; rerun browser/HMR and production checks
+passed. Setup documentation now explains that normal entrypoints install before
+launching Vite, and manual reinstalls require a restart. No CORS, CSRF, authentication,
+application, or framework change was used to resolve this tooling state.
+
+The temporary project was `mealplaner-foundation-a23e1b4443`, rooted at
+`/tmp/mealplaner-task08-ejmv4cqt/checkout`. It was stopped with ordinary Compose `down`.
+Its five named volumes and private verification checkout were retained; no volume
+removal was performed. The original development stack stayed running and its data,
+credentials, key, and existing volumes were untouched. Browser verification used the
+already installed host Chrome/Node with copied locked Playwright tooling; application
+setup and all declared CI commands used Docker-only runtimes.
+
+### BL-01 acceptance review
+
+| Area                           | Local evidence                                                                                                                                           | Remaining boundary                                                                      |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| Architecture/repository        | Root Laravel and integrated Vue/TypeScript/Vite preserved; no extra application roots or framework initialization.                                       | Domain/auth features remain later MVP work by design.                                   |
+| Backend routing/environment    | Existing CLI/test boot, health/readiness JSON, SPA/backend boundaries, and production assets passed.                                                     | No deployment claimed.                                                                  |
+| Frontend foundation            | Strict typing, real stores/router, component tests, actual development/production browser checks and HMR passed.                                         | Real device installation/update prompts are not covered by these checks.                |
+| PostgreSQL/isolation           | New database migration workflow, restricted-role full suite, transaction rollback, and safe committed-record persistence passed.                         | Original TASK-05 schema cleanup is still pending; no existing schema change authorized. |
+| Reproducible local environment | Clean checkout, new dependency/data volumes, same Compose setup, HTTP/browser integration, restart/recreation durability.                                | Backups, host reboot, and volume-loss recovery are separate/unverified.                 |
+| Quality/testing/build          | Lockfile installs, both quality gates, 34 backend / 12 frontend tests, coverage artifacts and production build passed.                                   | Native GitHub setup/caching/upload have not executed here.                              |
+| GitHub Actions                 | Push/PR/manual triggers, supported runtimes/service, immutable action refs, caches, gates, report upload, and fail-fast configuration validated locally. | First passing hosted run for the published commit is required to finish TASK-08/BL-01.  |
+
+No commit, push, repository-setting change, production deployment, or existing-data
+cleanup was performed. [ci.md](ci.md) documents status, exact workflow behavior,
+local reproduction, and troubleshooting; [DEVELOPMENT.md](DEVELOPMENT.md) is the
+complete fresh local setup procedure.
+
 ## TASK-07 — automated testing infrastructure (2026-11-03)
 
 The existing PHPUnit 12, Vitest 4.1.12, Vue Test Utils, guarded PostgreSQL provisioner,

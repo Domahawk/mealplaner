@@ -144,6 +144,10 @@ task scope, inspect existing work, and preserve unrelated changes.
   keys, or include credentials in logs, commands, documentation, or responses. Use
   safe metadata, examples, and managed secret workflows. Synthetic test fixtures
   must not contain real credentials.
+- Keep `.github/workflows/ci.yml` aligned with the documented quality/test/build
+  scripts. Preserve lockfile installs, ephemeral CI database credentials, action SHA
+  pins, read-only permissions, and nonzero failure propagation. Do not claim a hosted
+  run passed based only on local checks or add deployment steps incidentally.
 - Never commit or push without explicit approval.
 
 ## Task discipline
