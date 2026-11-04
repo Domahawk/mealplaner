@@ -47,6 +47,12 @@ default array session driver with file sessions in a private temporary directory
 They clean up their own files and never use development session storage. Their
 probe routes and forced CSRF validation exist only in the test application.
 
+Account integration tests additionally exercise the real `/api/auth` endpoints with
+CSRF checks enabled, fresh guard/session instances, session rotation and old-cookie
+replay after logout. They use transactional user records in the guarded test database.
+Vue authentication tests use real Pinia/router instances with mocked HTTP responses.
+See [authentication.md](authentication.md) for the flow and security boundaries.
+
 Build the frontend before the backend production-asset test:
 
 ```bash

@@ -3,15 +3,17 @@ import { flushPromises, mount, type VueWrapper } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
 import { createMemoryHistory, createRouter } from 'vue-router';
 import App from '../../resources/js/App.vue';
-import { routes } from '../../resources/js/router';
+import { installAuthenticationGuard, routes } from '../../resources/js/router';
 import { useThemeStore } from '../../resources/js/stores/theme';
 
 let wrapper: VueWrapper | undefined;
+const healthFetch = vi.fn<typeof fetch>();
 
 async function mountApp() {
     const pinia = createPinia();
     setActivePinia(pinia);
     const router = createRouter({ history: createMemoryHistory(), routes });
+    installAuthenticationGuard(router, pinia);
     await router.push('/');
     await router.isReady();
     wrapper = mount(App, { attachTo: document.body, global: { plugins: [pinia, router] } });
@@ -22,7 +24,15 @@ async function mountApp() {
 beforeEach(() => {
     localStorage.clear();
     document.documentElement.removeAttribute('data-theme');
-    vi.stubGlobal('fetch', vi.fn());
+    healthFetch.mockReset();
+    vi.stubGlobal(
+        'fetch',
+        vi.fn((input: RequestInfo | URL, init?: RequestInit) =>
+            input === '/api/auth/session'
+                ? Promise.resolve(new Response(JSON.stringify({ user: null })))
+                : healthFetch(input, init),
+        ),
+    );
 });
 
 afterEach(() => {
@@ -39,7 +49,7 @@ describe('Mealplaner application', () => {
         expect(wrapper.text()).toContain('initial development stage');
         expect(document.title).toBe('Mealplaner');
         expect(wrapper.text()).toContain('Not checked');
-        expect(fetch).not.toHaveBeenCalled();
+        expect(healthFetch).not.toHaveBeenCalled();
     });
 
     it('navigates between Vue Router views', async () => {
@@ -90,13 +100,13 @@ describe('Mealplaner application', () => {
     });
 
     it('checks the same-origin API when requested and displays success', async () => {
-        vi.mocked(fetch).mockResolvedValue(
+        healthFetch.mockResolvedValue(
             new Response(JSON.stringify({ status: 'ok', database: 'connected' })),
         );
         const { wrapper } = await mountApp();
         await wrapper.get('.primary-button').trigger('click');
         await flushPromises();
-        expect(fetch).toHaveBeenCalledWith(
+        expect(healthFetch).toHaveBeenCalledWith(
             '/api/ready',
             expect.objectContaining({ cache: 'no-store' }),
         );
@@ -106,7 +116,7 @@ describe('Mealplaner application', () => {
 
     it('shows loading state and prevents duplicate requests', async () => {
         let resolve: ((value: Response) => void) | undefined;
-        vi.mocked(fetch).mockReturnValue(
+        healthFetch.mockReturnValue(
             new Promise<Response>((complete) => {
                 resolve = complete;
             }),
@@ -117,11 +127,11 @@ describe('Mealplaner application', () => {
         expect(wrapper.text()).toContain('Checking the API and database');
         resolve?.(new Response(JSON.stringify({ status: 'ok', database: 'connected' })));
         await flushPromises();
-        expect(fetch).toHaveBeenCalledTimes(1);
+        expect(healthFetch).toHaveBeenCalledTimes(1);
     });
 
     it('handles a failed database response without exposing server details', async () => {
-        vi.mocked(fetch).mockResolvedValue(
+        healthFetch.mockResolvedValue(
             new Response(JSON.stringify({ message: 'secret connection details' }), { status: 503 }),
         );
         const { wrapper } = await mountApp();
@@ -132,12 +142,12 @@ describe('Mealplaner application', () => {
     });
 
     it('handles network failure and supports retry', async () => {
-        vi.mocked(fetch).mockRejectedValueOnce(new TypeError('Failed to fetch'));
+        healthFetch.mockRejectedValueOnce(new TypeError('Failed to fetch'));
         const { wrapper } = await mountApp();
         await wrapper.get('.primary-button').trigger('click');
         await flushPromises();
         expect(wrapper.text()).toContain('Could not reach the server');
-        vi.mocked(fetch).mockResolvedValue(
+        healthFetch.mockResolvedValue(
             new Response(JSON.stringify({ status: 'ok', database: 'connected' })),
         );
         await wrapper.get('.primary-button').trigger('click');
@@ -146,7 +156,7 @@ describe('Mealplaner application', () => {
     });
 
     it('rejects malformed success responses', async () => {
-        vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ status: 'unexpected' })));
+        healthFetch.mockResolvedValue(new Response(JSON.stringify({ status: 'unexpected' })));
         const { wrapper } = await mountApp();
         await wrapper.get('.primary-button').trigger('click');
         await flushPromises();

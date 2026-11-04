@@ -1,5 +1,14 @@
 # PostgreSQL persistence
 
+## Current account persistence (TASK-10)
+
+The User model and users migration support native session authentication. TASK-10
+confirmed the dedicated local database had no public tables, then applied only
+`2026_11_04_000000_create_users_table.php`. Migration history and `users` now exist;
+the unrelated cache migration remains pending because local cache/sessions use files.
+No development users were created by automated or browser verification; all such
+records stayed in generated restricted databases. See [authentication.md](authentication.md).
+
 ## Current automated testing (TASK-07)
 
 `docker compose exec -T --user app backend composer test` is now the canonical full
@@ -14,7 +23,8 @@ The sections below retain the TASK-04 inspection/results. Their narrower integra
 suite and SQLite-default Composer command describe that historical state; the current
 commands above supersede it. The TASK-05 development-table cleanup was completed on 2026-11-04 after explicit
 approval and locked empty checks, separately from automated tests. The original
-zero-table state is restored and migration history remains uninitialized.
+zero-table state was restored at that time. TASK-10's account initialization above
+supersedes that historical migration status.
 
 ## Initial TASK-04 inspection — 2026-11-02
 

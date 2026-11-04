@@ -1,5 +1,118 @@
 # Verification record
 
+## TASK-10 — complete authentication (2026-11-04)
+
+Started with a clean working tree on local `main` at `2ff0596`. Created and switched
+to **`feature/task-10-authentication` from local `main` before modifying files**.
+`AGENTS.md` now requires dedicated feature/fix branches, inspection before switching,
+preservation of uncommitted work, explicit permission for publication/merging, checks,
+and an active-branch/changed-file report for every future development task.
+
+### Implementation
+
+Completed the missing native session authentication using Laravel's existing guard,
+Eloquent, hashing, web middleware, validation and throttling. Added the User model,
+users migration, account Form Requests and controller, five same-origin JSON routes,
+Vue login/register/account views, session-backed Pinia state and navigation checks.
+Login/registration rotate session IDs and CSRF tokens. Logout invalidates session
+data and regenerates the token. Errors, password limits and safe API serialization
+are covered. No dependency, architecture or local-environment replacement was needed.
+See [authentication.md](authentication.md) for the full contract and boundaries.
+
+### Commands and results
+
+All PHP checks used `docker compose exec -T --user app backend`; frontend checks
+used `docker compose exec -T --user node frontend` from the root checkout.
+
+| Command                                       | Result                                                                                                 |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `composer quality`                            | Passed: Pint checks 44 PHP files; PHPStan/Larastan reports no errors.                                  |
+| `composer test`                               | Passed: 58 tests, 879 assertions on generated restricted PostgreSQL storage.                           |
+| `composer test:coverage`                      | Passed: 58 tests, 879 assertions; PHP line coverage 98.78% (81/82), Clover/HTML reports generated.     |
+| `composer test:sqlite`                        | Passed: 53 tests, 458 assertions, memory-only SQLite.                                                  |
+| `npm run quality`                             | Passed: ESLint with zero warnings, Prettier and strict Vue TSC.                                        |
+| `npm run test:unit` / `npm run test:coverage` | Passed: 23 tests in three files. Final coverage run reports 87.55% lines; HTML/LCOV/summary generated. |
+| `npm run build`                               | Passed: Vue TSC, Vite and production PWA generation.                                                   |
+| `npm run verify:build`                        | Passed: entry, CSS, offline shell, worker, manifest and icons.                                         |
+| `php artisan route:list --path=auth -v`       | Passed: five auth routes use `web`; current-user/logout also use `auth`; login/register are throttled. |
+| `php artisan migrate:status`                  | Users migration ran in local development; unrelated cache migration remains pending.                   |
+
+Backend tests enable actual request-forgery validation without disabling testing mode
+or the database guards. File sessions use private temporary test directories. Fresh
+guards/session instances recover identity from cookies and persisted files. Tests
+verify hashed account storage, validation, generic invalid credentials, throttling,
+rotation, CSRF rejection on real endpoints, protected HTTP routes and failure to
+reuse an old session after logout. Vue tests use real router/Pinia instances and
+mock only HTTP; they cover forms, validation, network errors, expired CSRF recovery,
+session restoration, logout and expired-session navigation.
+
+### Browser and live HTTP verification
+
+A temporary PHP server served built assets and real Laravel routes from a fresh
+restricted PostgreSQL test database. Its guard checked effective testing configuration
+and actual database/role identity before serving account requests. Only synthetic
+users were created. Host Chrome/Playwright verified:
+
+- Guest denial, real registration, private account navigation, authenticated browser
+  reloads, logout and post-logout denial.
+- Invalid credentials with field feedback/password clearing, then successful login
+  and another authenticated reload.
+- Mobile/desktop widths of 320, 390 and 1440 pixels without horizontal overflow.
+  Mobile screenshots were inspected; no browser exceptions occurred.
+- A real cross-site mutation without a CSRF header returns HTTP 419; health and
+  framework liveness remain HTTP 200.
+- Production application browser suite: **2 passed, 1 development-only skip**.
+  The worker installs and serves public routes offline, caches no API responses,
+  and refuses offline `/account` navigation. Chrome's temporary test-origin flag
+  provided a secure context for that private-network HTTP test origin; this does
+  not verify production HTTPS configuration.
+
+The production test was copied into an existing temporary Playwright runner because
+host dependency directories are Docker volume mount points. One initial copy used
+the runner's working directory rather than the repository; absolute source paths
+corrected it, and the current test including the private-route assertion then passed.
+No application configuration was changed to accommodate the browser runner.
+
+The public application/development-asset browser suite against the existing
+`http://localhost:8000` stack also reports **2 passed, 1 production-only skip**.
+The source-editing HMR test was not rerun. Read-only live HTTP checks confirm login
+and registration entries, guest account redirect to login, session bootstrap 200,
+current-user 401 for guests, `/api/health` 200 and `/up` 200.
+
+### Local persistence and safety
+
+Before applying a development migration, verified local mode, PostgreSQL, the
+dedicated Mealplaner database and **zero public tables**. Applied only the new users
+migration through ordinary `migrate --path=... --force`, creating migration history
+and users. No reset or unrelated cache migration ran. Final local metadata shows
+only `migrations` and `users`, with **zero development users**.
+
+Both temporary browser test databases/logins/session directories were removed after
+their servers stopped. Backend test runners also removed only their own generated
+resources. Existing data/volumes, local environment values and application keys were
+preserved. No secrets were displayed. No packages were installed, and both lockfiles
+remain unchanged. No Git commit, push, merge or PR was performed for TASK-10.
+
+### Changed files and remaining boundaries
+
+- Policy/docs: `AGENTS.md`, `README.md`, `docs/authentication.md`,
+  `docs/authentication-audit.md`, `docs/architecture.md`, `docs/database.md`,
+  `docs/DEVELOPMENT.md`, `docs/testing.md`, `docs/VERIFICATION.md`.
+- Backend: `app/Http/Controllers/AuthenticationController.php`,
+  `app/Http/Requests/{LoginRequest,RegisterRequest}.php`, `app/Models/User.php`,
+  `app/Rules/BcryptPasswordLimit.php`, `app/Providers/AppServiceProvider.php`,
+  `database/migrations/2026_11_04_000000_create_users_table.php`, `routes/web.php`.
+- Frontend: `resources/js/{app.ts,App.vue}`, `resources/js/lib/api.ts`,
+  `resources/js/router/index.ts`, `resources/js/stores/auth.ts`,
+  `resources/js/views/{AuthenticationView,AccountView}.vue`,
+  `resources/css/app.css`, `vite.config.ts`.
+- Tests: `tests/Feature/AuthenticationTest.php`,
+  `tests/frontend/{app,authentication}.test.ts`, `tests/e2e/application.spec.ts`.
+
+Password reset, email verification, remember-me, account editing and domain ownership
+remain future work. Production TLS/Secure cookies, shared session/cache storage and
+deployment are not verified here. Hosted CI for these uncommitted changes was not run.
+
 ## TASK-09 — authentication audit (2026-11-04)
 
 The [authentication audit](authentication-audit.md) inspected registration/login/logout

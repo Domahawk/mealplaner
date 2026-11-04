@@ -2,6 +2,8 @@ import '../css/app.css';
 import { createApp } from 'vue';
 import { createPinia } from 'pinia';
 import App from './App.vue';
-import { router } from './router';
+import { router, installAuthenticationGuard } from './router';
 
-createApp(App).use(createPinia()).use(router).mount('#app');
+const pinia = createPinia();
+installAuthenticationGuard(router, pinia);
+createApp(App).use(pinia).use(router).mount('#app');

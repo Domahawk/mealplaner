@@ -25,24 +25,26 @@ Existing Pinia-backed light/dark/system preferences, the user-triggered API/data
 connection check, Laravel liveness, and production PWA build/update support are preserved.
 No Inertia, Livewire, or authentication package is installed.
 
-The [TASK-09 authentication audit](docs/authentication-audit.md) confirms that native
-hashing, session cookies and web CSRF protection are available and tested.
-Registration, login/logout, user persistence, protected routes and frontend auth state
-are still missing. The session test verifies anonymous persistence only.
+Registration, login and logout are implemented with Laravel-native sessions and
+the integrated Vue forms. Session/CSRF protections, authenticated reloads and protected
+account navigation are tested. See [authentication](docs/authentication.md) for routes,
+validation, throttling and limitations; the [TASK-09 audit](docs/authentication-audit.md)
+records the earlier baseline.
 
 Planned MVP capabilities, **not yet implemented**:
 
-1. Register, log in, and log out.
-2. Create, view, edit, and delete user-owned products with nutritional information.
-3. Create recipes from existing products and specified quantities.
-4. Calculate recipe calories, protein, carbohydrates, and fat automatically.
-5. Record consumption by date.
-6. View daily calorie and macronutrient totals.
+1. Create, view, edit, and delete user-owned products with nutritional information.
+2. Create recipes from existing products and specified quantities.
+3. Calculate recipe calories, protein, carbohydrates, and fat automatically.
+4. Record consumption by date.
+5. View daily calorie and macronutrient totals.
 
-There are no user/domain models or domain migrations yet. PostgreSQL 18.6
+The User model and users migration exist; domain models/migrations remain future work. PostgreSQL 18.6
 connectivity, existing migration compatibility, and committed-record persistence
 across reconnects are verified in an isolated test database. Development migration
-history remains uninitialized and untouched. Docker lifecycle verification is recorded in [VERIFICATION.md](docs/VERIFICATION.md);
+history now records the users migration, applied only after confirming the local
+database was empty. The unrelated cache migration remains pending; local cache and
+sessions use files. Docker lifecycle verification is recorded in [VERIFICATION.md](docs/VERIFICATION.md);
 Mealplaner domain workflows remain future work. See [database.md](docs/database.md).
 
 ## Detected stack
@@ -72,10 +74,10 @@ installed packages. Use the existing container workflow.
 ## Repository structure
 
 ```text
-app/                       Laravel controllers and application provider
+app/                       Laravel controllers, Form Requests, User model and provider
 bootstrap/                 Laravel startup and route registration
 config/                    Laravel configuration
-database/                  Cache/cache-lock migration and empty seeder
+database/                  Cache/cache-lock and users migrations; empty seeder
 resources/js/              Integrated Vue SPA: views, components, router, stores,
                            composables, and same-origin API helper
 resources/css/app.css      Responsive application and theme styling
@@ -101,11 +103,12 @@ Laravel serves `resources/views/app.blade.php`, whose `@vite` directive loads
 existing Pinia instance and Vue Router, and mounts `App.vue` into `#app`.
 There is one root package manifest, lockfile, Vite configuration, and deployment.
 
-The existing HTML5-history routes are preserved: `/` (`welcome` route name), `/about`,
-and the Not Found catch-all. Their titles are `Mealplaner`, `About | Mealplaner`, and
-`Page not found | Mealplaner`. Laravel continues handling API, health, storage, and
-worker namespaces separately. The two real shared stores remain `theme` and
-`connection`; no demo/global stores or authentication guards were added.
+HTML5-history routes include `/` (`welcome` route name), `/about`, `/login`,
+`/register`, protected `/account`, and the Not Found catch-all, with page-specific
+titles. Laravel continues handling API, health, storage, and worker namespaces
+separately. Pinia stores manage theme, connectivity and session-backed account state.
+The authentication guard restores server-owned identity before private navigation;
+Laravel independently protects the account entry and current-user endpoint.
 
 TypeScript remains strict, with Vue TSC checking application components, tests, and
 tool configuration. Vitest and Vue Test Utils live under `tests/frontend`; Playwright
@@ -261,6 +264,14 @@ unrelated application feature is introduced.
 
 ## Verification commands and current results
 
+TASK-10 passes **58 PostgreSQL backend tests / 879 assertions**, **53 optional
+SQLite tests**, **23 frontend tests**, both quality gates, coverage and production
+build validation. Chrome verified the complete account flow and authenticated reloads
+on an isolated PostgreSQL database. Development assets and public routing passed;
+production PWA checks also passed, including offline account-route denial.
+The records below describe earlier foundation tasks; current details are in
+[VERIFICATION.md](docs/VERIFICATION.md#task-10--complete-authentication-2026-11-04).
+
 Run existing tools from the root application through running containers:
 
 ```bash
@@ -296,7 +307,8 @@ an initial verification probe mistakenly created two empty cache tables. Both we
 removed on 2026-11-04 after explicit approval, locks, and empty-table checks, restoring
 the original zero-table state. No existing records were changed or deleted. See the
 [incident record](docs/VERIFICATION.md#verification-incident-and-approved-cleanup)
-before any development schema work. Migration history remains uninitialized. `.env.example` now uses nonsecret Mealplaner database
+before development schema work. TASK-10 subsequently initialized only users and
+migration history after confirming the local database was empty. `.env.example` uses nonsecret Mealplaner database
 placeholders with a blank password. Keep `DB_HOST=postgres` inside the existing Compose
 network; use `127.0.0.1` only for an appropriate host-reachable database. The current
 container does not publish a database port. See [database.md](docs/database.md) for
@@ -320,6 +332,8 @@ setup, and its HMR test temporarily edits source. Do not remove database volumes
   infrastructure, detected versions, decisions, and technical debt.
 - [Authentication audit](docs/authentication-audit.md): existing security primitives,
   test coverage, missing account flows and subsequent implementation requirements.
+- [Authentication](docs/authentication.md): current registration/login/logout flows,
+  session/CSRF handling, validation, throttling, setup and test conventions.
 - [CI guide](docs/ci.md): workflow triggers, isolation, runtimes, caching, reports,
   local reproduction, hosted-status limits, and troubleshooting.
 - [Testing guide](docs/testing.md): canonical PostgreSQL tests, safe Laravel utilities,
@@ -336,7 +350,7 @@ setup, and its HMR test temporarily edits source. Do not remove database volumes
 - [Template reuse guide](docs/NEW_PROJECT.md): reference for creating a different
   project from the starter; do not use it to scaffold another application here.
 
-Next steps are authentication and domain features within this integrated application,
+Next steps are domain features and their ownership checks within this integrated application,
 plus deliberate dependency/security maintenance. The locked dependency audit reports
 26 low/moderate development-graph findings; the production-only audit reports zero.
 No forced upgrades, database schema changes, CI workflows, cloud deployments, or

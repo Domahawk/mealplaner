@@ -3,6 +3,21 @@
 These instructions apply throughout this repository. Follow the user's authorized
 task scope, inspect existing work, and preserve unrelated changes.
 
+## Git Branching Policy
+
+- Never implement changes directly on `main`.
+- Before starting a development task, inspect the current branch and working tree.
+- Create and switch to a dedicated branch named `feature/task-XX-short-description`,
+  or `fix/task-XX-short-description` for bug fixes.
+- Branch from local `main` unless the task explicitly specifies another base.
+- Never discard, overwrite, or stash uncommitted changes without explicit approval.
+- If creating or switching branches could affect existing work, stop and report the issue.
+- Do not automatically commit, push, merge, or create pull requests unless explicitly instructed.
+- Run all relevant tests and quality checks before declaring a task complete.
+- Report the active branch and modified files upon completion.
+
+This policy applies to every future Codex development task.
+
 ## Preserve the application architecture
 
 - Read `README.md`, `docs/architecture.md`, and relevant implementation/configuration
@@ -52,8 +67,8 @@ task scope, inspect existing work, and preserve unrelated changes.
   or repository layers. Use Eloquent relationships and appropriate query patterns.
 - Enforce authentication, authorization, ownership, and referenced-resource access on
   the server when those features are implemented. Browser checks are not authorization.
-- Authentication is currently absent. Inspect the actual capabilities before adding
-  native authentication; do not assume Sanctum, a user model, or auth routes exist.
+- Preserve native session authentication and the integrated Vue account flows.
+  Inspect the implementation before extending it; no Sanctum or token system is used.
 - Keep new backend routes above the SPA fallback and reserve their namespaces in both
   Laravel routing and the PWA navigation fallback when applicable. API errors must
   retain JSON responses and Laravel's standard HTTP status conventions.

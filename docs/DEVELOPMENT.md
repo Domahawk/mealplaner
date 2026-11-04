@@ -7,11 +7,13 @@ into the Blade entry `resources/views/app.blade.php`. `App.vue` supplies the Mea
 header, skip link, main router outlet, existing theme controls, and PWA update notice.
 `resources/css/app.css` supplies the reused responsive light/dark styling.
 
-Vue Router keeps HTML5 history and the existing `/`, `/about`, and Not Found routes.
+Vue Router keeps HTML5 history and the existing `/`, `/about`, and Not Found routes,
+and adds `/login`, `/register` and protected `/account` in TASK-10.
 The `/` route keeps its `welcome` name for compatibility. Route metadata provides
 page titles; navigation moves keyboard focus to the main region. Pinia is registered
-once in the existing entry and holds only the real `theme` and `connection` stores.
-No authentication pages or guards are currently implemented.
+once in the existing entry and holds `theme`, `connection` and `auth` stores.
+The server session supplies account identity; Laravel also protects direct account
+navigation. [Authentication](authentication.md) documents flows and setup.
 
 The verified frontend versions are Vue 3.5.44, Vite 7.3.7, TypeScript 5.8.3, Vue Router
 4.6.4, Pinia 3.0.4, and Laravel's Vite plugin 2.1.0. Verification used the existing
@@ -37,7 +39,8 @@ Pinia, typed browser fixtures, and mocked HTTP responses. Browser tests remain u
 and Vue/CSS HMR. It temporarily edits the Home template and CSS and restores both;
 do not run it while someone else is editing those files.
 
-No `VITE_API_BASE_URL` is required: the existing API helper uses relative `/api/ready`.
+No `VITE_API_BASE_URL` is required: the API helper uses relative `/api/ready` and
+`/api/auth` URLs.
 Public `VITE_APP_NAME`/`VITE_PWA_SHORT_NAME` control generated PWA/offline metadata;
 they do not override the product's Mealplaner header and route titles. The new example
 short name is Mealplaner; actual local overrides are preserved. Existing `APP_URL`,
@@ -55,8 +58,11 @@ method, and existing dependency advisories. No additional dependencies were intr
 
 **Existing development database:** the two empty tables accidentally created during
 TASK-05 were removed on 2026-11-04 after explicit approval, locks, and empty-table
-checks. The original zero-table state is restored; migration history remains
-uninitialized. See the [incident record](VERIFICATION.md#verification-incident-and-approved-cleanup).
+checks. TASK-10 later confirmed that empty database and applied only the users
+migration. Migration history and `users` now exist; the unrelated cache migration
+remains pending, with file cache/sessions still in use. See
+[authentication setup](authentication.md#setup-and-verification) and the
+[incident record](VERIFICATION.md#verification-incident-and-approved-cleanup).
 Inspect and confirm any existing database before applying migrations; cleanup does
 not authorize initializing an existing database automatically.
 
