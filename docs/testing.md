@@ -59,6 +59,14 @@ two independent cookie sessions to verify that forged identifiers cannot switch 
 invalidate another user's session. Future resource features must add real ownership
 and policy tests; [authorization.md](authorization.md) defines the required cases.
 
+TASK-12 extends these suites rather than adding a second framework. New regressions
+cover hash-shaped plaintext passwords, native same-session locking with file/array
+stores, rate-limit normalization/expiry/IP bounds, file-session expiry, stale CSRF,
+malformed credentials, secure cookies and Vue status/conflict recovery. File cache
+fixtures are created under each test's private temporary directory and cleaned up
+with its sessions; they never use development cache files. See
+[security-verification.md](security-verification.md) for coverage and security limits.
+
 Build the frontend before the backend production-asset test:
 
 ```bash

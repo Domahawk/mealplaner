@@ -25,8 +25,9 @@ responses use `Cache-Control: no-store, private`; password hashes and remember t
 are never serialized. The account response also disables caching.
 
 `AuthenticationController` handles HTTP/session actions; Form Requests validate
-input. `App\Models\User` uses the framework's `hashed` cast and native provider
-defaults. The users migration adds only account persistence, with a unique email
+input. Registration explicitly hashes validated plaintext with Laravel `Hash::make`,
+including passwords that look like encoded hashes. `App\Models\User` retains the
+framework's `hashed` cast and native provider defaults. The users migration adds only account persistence, with a unique email
 constraint. No domain schema or password-reset infrastructure was introduced.
 
 ## Validation and abuse protection
@@ -49,6 +50,13 @@ The existing configured cache stores the rate limits. Testing uses an isolated
 array cache; local development uses the existing file cache. Production must choose
 appropriate shared cache/session storage when running multiple instances.
 
+Laravel's native per-session request blocking is enabled for all web sessions,
+including reads, so a delayed response cannot save authenticated state after logout.
+The configured atomic-lock cache store supplies a 120-second lease and five-second
+wait. File cache works locally; tests also cover private file-lock storage and array
+cache. Shared deployments need shared locks/session storage and request lifetimes
+shorter than the lease. Existing session serialization and application keys are preserved.
+
 ## Vue integration and CSRF
 
 `resources/js/stores/auth.ts` holds account state in memory. The initial router
@@ -68,7 +76,10 @@ responsive styling. Password fields clear after submission. Logout clears the st
 and returns to login. Session/CSRF failures invalidate stale client state; the next
 explicit submission bootstraps a fresh session rather than replaying a mutation
 automatically. Network/server errors receive safe messages. Server authorization
-remains authoritative; Vue navigation checks are only a UI convenience.
+remains authoritative; Vue navigation checks are only a UI convenience. HTTP error
+statuses remain actionable even if a response body is not JSON. A 409 on login or
+registration triggers a safe current-session read and succeeds only when the server
+confirms a user; account mutations are never replayed automatically.
 
 The PWA never caches API responses; `/account` is excluded from offline navigation
 fallback. Its generated public shell contains no account data. Offline session
@@ -107,6 +118,10 @@ SQLite memory tests remain supported. Frontend tests use real Vue Router/Pinia a
 mock only HTTP responses. Coverage commands remain in [testing.md](testing.md).
 Executed results, including the isolated Chrome smoke test, are recorded in
 [VERIFICATION.md](VERIFICATION.md).
+
+[TASK-12 security verification](security-verification.md) inventories reused/new
+coverage, the resolved hashing/concurrency/client-state defects, actual browser/HTTP
+checks, dependency audit findings and remaining deployment limits.
 
 ## Boundaries and deployment prerequisites
 

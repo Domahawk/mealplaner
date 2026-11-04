@@ -234,7 +234,72 @@ describe('native session authentication integration', () => {
         expect(wrapper.text()).not.toContain(fixtureUser.email);
     });
 
-    it.each([429, 500])(
+    it('resynchronizes the session when another tab has already authenticated', async () => {
+        const { wrapper, router, auth } = await mountApp('/login');
+        signedIn = fixtureUser;
+        failure = { status: 409, body: { message: 'You are already signed in.' } };
+        await fillLogin(wrapper);
+        await wrapper.get('form').trigger('submit');
+        await flushPromises();
+
+        expect(router.currentRoute.value.name).toBe('account');
+        expect(auth.user).toEqual(fixtureUser);
+    });
+
+    it('does not treat an authentication conflict as success without a verified server user', async () => {
+        failure = { status: 409, body: {} };
+        const { wrapper, router, auth } = await mountApp('/login');
+        await fillLogin(wrapper);
+        await wrapper.get('form').trigger('submit');
+        await flushPromises();
+
+        expect(router.currentRoute.value.name).toBe('login');
+        expect(auth.user).toBeNull();
+        expect(wrapper.text()).not.toContain(fixtureUser.email);
+    });
+
+    it('clears expired private state even when a 401 response body is not JSON', async () => {
+        signedIn = fixtureUser;
+        const { wrapper, router, auth } = await mountApp('/account');
+        signedIn = null;
+        const backend = vi.mocked(fetch).getMockImplementation();
+        if (!backend) throw new Error('The HTTP fixture must be configured.');
+        vi.mocked(fetch).mockImplementation((input, init) =>
+            input === '/api/auth/logout'
+                ? Promise.resolve(new Response('<html>Unauthorized</html>', { status: 401 }))
+                : backend(input, init),
+        );
+
+        await wrapper.get('nav button').trigger('click');
+        await flushPromises();
+
+        expect(router.currentRoute.value.name).toBe('login');
+        expect(auth.user).toBeNull();
+        expect(wrapper.text()).not.toContain(fixtureUser.email);
+    });
+
+    it('fails closed when a successful bootstrap response contains an invalid identity', async () => {
+        vi.mocked(fetch).mockImplementation(
+            async () =>
+                new Response(
+                    JSON.stringify({
+                        user: {
+                            id: 'not-a-number',
+                            name: fixtureUser.name,
+                            email: fixtureUser.email,
+                        },
+                    }),
+                ),
+        );
+        const { wrapper, router, auth } = await mountApp('/account');
+
+        expect(router.currentRoute.value.name).toBe('login');
+        expect(auth.user).toBeNull();
+        expect(wrapper.text()).not.toContain(fixtureUser.email);
+        expect(wrapper.text()).toContain('Unable to verify your session.');
+    });
+
+    it.each([403, 404, 429, 500])(
         'shows a safe error for status %s without rendering server diagnostics',
         async (status) => {
             failure = { status, body: { message: 'private server diagnostic fixture' } };

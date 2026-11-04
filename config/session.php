@@ -20,6 +20,12 @@ return [
 
     'driver' => env('SESSION_DRIVER', 'database'),
 
+    // Prevent overlapping requests for one session from restoring logged-out data.
+    // The existing file cache (array in tests) supports Laravel's atomic locks.
+    'block' => true,
+    'block_lock_seconds' => 120,
+    'block_wait_seconds' => 5,
+
     /*
     |--------------------------------------------------------------------------
     | Session Lifetime

@@ -1,5 +1,122 @@
 # Verification record
 
+## TASK-12 — authentication security verification (2026-11-04)
+
+Started with a clean tree on local `main` at `3950439`. Created and switched to
+**`feature/task-12-auth-security` from local `main` before editing**. Reused the
+existing session, CSRF, authorization, route and Vue tests rather than adding another
+framework or placeholder models. [Security verification](security-verification.md)
+contains the coverage inventory, findings, fixes and remaining limits.
+
+### Findings and changes
+
+New regressions initially failed for hash-shaped password input and missing session
+locking, plus two Vue failures: non-JSON 401 handling and another tab's 409 conflict.
+
+- Registration now explicitly hashes all validated password input using native
+  `Hash::make`. A bcrypt-looking password is treated as plaintext, not an existing hash.
+- Native per-session request blocking now covers the complete web-session lifecycle,
+  including reads, with the existing lock-capable cache. The lease is 120 seconds;
+  acquisition waits at most five seconds. Stateless API health remains independent.
+- Authentication status handling survives an empty/non-JSON response body; successful
+  malformed identity responses still fail closed.
+- Login/register 409 conflicts trigger a safe session read; only a server-confirmed
+  user permits progress. No mutation is replayed and an unverified 409 grants no access.
+
+Added 18 backend cases and six frontend cases. They extend existing fixtures for
+throttle normalization/cookie reset/expiry/IP bounds, credential types, password
+policy, session expiry, stale CSRF tokens, Secure-cookie flags, file/array session
+locks and client failure/recovery. Existing duplicate registration, hash byte/null
+limits, two-user access, session rotation/invalidation and 401/403/404 tests are reused.
+
+The session-lock test temporarily disables exception rendering to observe native
+`LockTimeoutException`; exception handling is restored before its final expected 401.
+Its first harness revision missed that restoration and was corrected without changing
+the authentication contract or weakening an assertion.
+
+### Executed commands
+
+PHP commands use `docker compose exec -T --user app backend`; frontend commands use
+`docker compose exec -T --user node frontend` from the repository root.
+
+| Command                                  | Actual result                                                                                                                |
+| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `composer test`                          | Passed after fixes: 88 tests, 1,475 assertions at the first complete green run.                                              |
+| `composer test:coverage`                 | Final expanded suite passed: 88 tests, 1,481 assertions; app/routes line coverage 98.81% (83/84), Clover/HTML generated.     |
+| `composer test:sqlite`                   | Passed: 83 tests, 820 assertions; memory-only SQLite.                                                                        |
+| `composer quality`                       | Passed: Pint, 45 files; PHPStan/Larastan, no errors.                                                                         |
+| `npm run test:unit`                      | Passed: 32 tests across three files.                                                                                         |
+| `npm run test:coverage`                  | Passed: 32 tests; 89.09% line coverage, HTML/LCOV/summary generated.                                                         |
+| `npm run quality`                        | Passed: zero-warning ESLint, Prettier and strict Vue TSC.                                                                    |
+| `npm run build` / `npm run verify:build` | Passed: type-checked Vite/PWA output and artifact validation.                                                                |
+| `composer audit --locked --format=json`  | Passed: no advisories or abandoned packages reported.                                                                        |
+| `npm audit --omit=dev --json`            | Passed: zero production vulnerabilities.                                                                                     |
+| Full `npm audit --json`                  | Exit 1: 26 existing development findings, 2 low and 24 moderate; no high/critical. No forced upgrade or suppression applied. |
+
+### Actual browser, concurrency and throttling probes
+
+A temporary four-worker PHP server ran the same root application/build in the
+existing backend container. Its guard verified testing mode and actual restricted
+PostgreSQL database/role identity. Each run provisioned only its own random database,
+login and private session/cache/storage directories; credentials stayed in process
+memory. Migrations ran only there. No development account or schema was modified.
+
+The final Chrome/HTTP probe exited successfully and verified:
+
+- Actual registration, login, logout, invalid credentials, authenticated page reloads,
+  post-logout denial, 320/390/1440-pixel layouts and no browser exceptions.
+- Two tabs sharing cookies: one registers, the stale login tab receives a conflict,
+  refreshes the server session and reaches its account successfully.
+- A controlled read paused after loading the session but before persistence. Logout
+  remained queued until that read was released, then returned 204. Both the current
+  browser and a context replaying the old cookie received 401 afterward.
+- Five case/whitespace variants of an unknown email returned generic 422 errors
+  across fresh PHP requests. A new browser session's sixth request received 429
+  with Retry-After, proving the private file cache carries the throttle across requests.
+- Real cross-site mutation rejection (419) and successful health/liveness responses.
+
+A separate negative control also exited successfully: a switch in the **temporary
+guarded router only** disabled session blocking for a paused read and logout. Logout
+finished while the read was pending; releasing the read restored authentication,
+reproducing the pre-fix race. A normal subsequent logout removed that test session.
+No disable-lock or pause hook is present in application routes or production code.
+
+The initial concurrency fixture attempted to use Laravel's response factory before
+binding an HTTP request. Its diagnostic response failed, so those initial probes
+were not counted as successful. The temporary diagnostic handler was corrected,
+and the final complete browser probe plus positive/negative concurrency controls passed.
+
+The temporary worker groups were stopped before dropping only their generated
+databases/logins and removing their private storage. Existing development services
+and volumes were not restarted or removed. Browser-only secure-context flags were
+limited to the temporary private HTTP test origin, not application configuration.
+
+Final read-only development HTTP checks confirmed account redirect 302, protected
+API 401 JSON even with HTML Accept, unknown account 404, unsigned storage 403 JSON,
+and public login/register/health/liveness 200. The diagnostic test path returns 404
+on the real application, and the temporary HTTP listener is closed.
+
+### Scope and final review
+
+No unresolved critical authentication/authorization finding remains identified in
+the reviewed current flows. BL-02's account/access-control foundation is verified for
+MVP feature development. Future domain Policies/ownership tests, production HTTPS,
+Secure cookies, proxy trust, shared stores and bounded request lifetimes remain
+requirements; existing PHP session serialization is intentionally preserved.
+Password reset, email verification, remember-me and MFA remain outside this scope.
+Full-load testing, production deployment and hosted CI were not claimed.
+
+Modified implementation: `app/Http/Controllers/AuthenticationController.php`,
+`config/session.php`, `resources/js/lib/api.ts`, `resources/js/stores/auth.ts`.
+Tests: `tests/Feature/AuthenticationTest.php`, `tests/Feature/WebSecurityTest.php`,
+`tests/frontend/authentication.test.ts`. Documentation: `README.md`,
+`docs/security-verification.md`, `docs/authentication.md`, `docs/architecture.md`,
+`docs/testing.md` and this record.
+
+Both lockfiles and application architecture remain unchanged. No real local environment
+values, application keys or user credentials were displayed. No Git commit, push,
+merge or PR was performed. All changes remain on the requested feature branch.
+
 ## TASK-11 — authorization (2026-11-04)
 
 Started with a clean tree on local `main` at `406643b`; created and switched to

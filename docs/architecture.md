@@ -179,6 +179,12 @@ TASK-11 verifies native account access and two-user session isolation. Unknown
 Laravel Policies with real resource features, server-derived ownership and validation
 of referenced records. No placeholder policy/model or domain resource is introduced.
 
+TASK-12 explicitly hashes public registration passwords and enables native per-session
+request locks across web routes to prevent late writes from undoing logout. Vue keeps
+HTTP authentication status handling for non-JSON error bodies and safely rechecks
+the session after another tab's login conflict. [Security verification](security-verification.md)
+records regression coverage, a multi-worker overlap probe and remaining limits.
+
 ## Persistence and environment
 
 `config/database.php` defaults to PostgreSQL, with an explicitly separate in-memory

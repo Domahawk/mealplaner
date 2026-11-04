@@ -9,6 +9,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 
 class AuthenticationController extends Controller
@@ -22,7 +23,10 @@ class AuthenticationController extends Controller
     {
         abort_if(Auth::check(), 409, 'You are already signed in.');
 
-        $user = User::create($request->safe()->only(['name', 'email', 'password']));
+        $attributes = $request->safe()->only(['name', 'email']);
+        // Untrusted input is plaintext even if it happens to look like a valid hash.
+        $attributes['password'] = Hash::make($request->string('password')->toString());
+        $user = User::create($attributes);
         Auth::login($user);
         $request->session()->regenerate();
 

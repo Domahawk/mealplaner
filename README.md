@@ -36,6 +36,10 @@ session-owned identity and the scoped queries/Policies required for future resou
 Two-user tests verify existing account boundaries. Unknown `/account/...` paths
 return 404; products, recipes and food logs have no endpoints or policies yet.
 
+[TASK-12 security verification](docs/security-verification.md) covers the current
+account flows, session invalidation/concurrency, CSRF, throttling and client-state
+handling. It records resolved defects and the limits of local MVP verification.
+
 Planned MVP capabilities, **not yet implemented**:
 
 1. Create, view, edit, and delete user-owned products with nutritional information.
@@ -269,6 +273,13 @@ unrelated application feature is introduced.
 
 ## Verification commands and current results
 
+TASK-12 passes **88 PostgreSQL tests / 1,481 assertions**, **83 SQLite tests**,
+**32 frontend tests**, both quality gates, coverage and production build checks.
+Isolated Chrome/HTTP probes verify account flows, shared-file throttling and delayed
+read/logout ordering, including a negative control that reproduces the fixed race.
+Production dependency audits report no advisories; 26 existing low/moderate development
+findings remain. See [security verification](docs/security-verification.md).
+
 TASK-11 verifies current authorization boundaries: **70 PostgreSQL tests / 1,105
 assertions**, **65 optional SQLite tests**, **26 frontend tests**, quality gates,
 coverage and production build validation. Tests cover guest denial, two-user account
@@ -347,6 +358,8 @@ setup, and its HMR test temporarily edits source. Do not remove database volumes
   session/CSRF handling, validation, throttling, setup and test conventions.
 - [Authorization](docs/authorization.md): current route audit, account access tests,
   IDOR prevention and required Policies/scoped queries for future owned resources.
+- [Security verification](docs/security-verification.md): authentication coverage,
+  resolved security/functionality defects, dependency audits and remaining limitations.
 - [CI guide](docs/ci.md): workflow triggers, isolation, runtimes, caching, reports,
   local reproduction, hosted-status limits, and troubleshooting.
 - [Testing guide](docs/testing.md): canonical PostgreSQL tests, safe Laravel utilities,
