@@ -173,6 +173,12 @@ user-owned data and referenced products/recipes require server-side ownership ch
 frontend navigation guards cannot provide authorization. Password reset, email
 verification, remember-me and other account extensions remain outside TASK-10.
 
+TASK-11 verifies native account access and two-user session isolation. Unknown
+`/account/...` paths are reserved from the SPA fallback and return 404. The
+[authorization conventions](authorization.md) require owner-scoped Eloquent queries,
+Laravel Policies with real resource features, server-derived ownership and validation
+of referenced records. No placeholder policy/model or domain resource is introduced.
+
 ## Persistence and environment
 
 `config/database.php` defaults to PostgreSQL, with an explicitly separate in-memory
@@ -228,7 +234,7 @@ shared storage rather than assuming current file sessions are sufficient.
   permissions before running ordinary migrations. Test credentials are ephemeral
   and separate from development; no test environment file is created.
 - Vitest uses JSDOM and Vue Test Utils with real route definitions, fresh Pinia,
-  memory history, a matchMedia stub, and mocked HTTP responses. Twenty-three tests cover
+  memory history, a matchMedia stub, and mocked HTTP responses. Twenty-six tests cover
   account flows and session restoration, Mealplaner title/welcome/development notice,
   startup without a connectivity check, routing,
   document titles/main focus, theme behavior, loading, connectivity, retries, and

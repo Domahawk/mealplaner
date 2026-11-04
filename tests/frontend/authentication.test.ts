@@ -176,6 +176,21 @@ describe('native session authentication integration', () => {
         expect(wrapper.text()).not.toContain(fixtureUser.email);
     });
 
+    it('clears private account content when an API mutation rejects an expired session', async () => {
+        signedIn = fixtureUser;
+        const { wrapper, router, auth } = await mountApp('/account');
+        signedIn = null;
+        failure = { status: 401, body: { message: 'Unauthenticated.' } };
+
+        await wrapper.get('nav button').trigger('click');
+        await flushPromises();
+
+        expect(router.currentRoute.value.name).toBe('login');
+        expect(auth.user).toBeNull();
+        expect(wrapper.get('h1').text()).toBe('Log in');
+        expect(wrapper.text()).not.toContain(fixtureUser.email);
+    });
+
     it('recovers from CSRF expiry on the next explicit submission', async () => {
         failure = { status: 419, body: {} };
         const { wrapper, auth } = await mountApp('/login');
@@ -189,6 +204,34 @@ describe('native session authentication integration', () => {
         await wrapper.get('form').trigger('submit');
         await flushPromises();
         expect(wrapper.get('h1').text()).toBe('Your account');
+    });
+
+    it('rejects forged local account state when the server still considers the visitor a guest', async () => {
+        const { wrapper, router, auth } = await mountApp('/about');
+        auth.user = fixtureUser;
+        auth.initialized = true;
+        localStorage.setItem('auth', JSON.stringify({ user: fixtureUser }));
+
+        await router.push('/account');
+        await flushPromises();
+
+        expect(router.currentRoute.value.name).toBe('login');
+        expect(auth.user).toBeNull();
+        expect(wrapper.text()).not.toContain(fixtureUser.email);
+    });
+
+    it('uses the current server identity instead of a client-supplied user selector', async () => {
+        signedIn = fixtureUser;
+        const { wrapper, router, auth } = await mountApp('/about');
+        const otherUser = { id: 8, name: 'Other Fixture', email: 'other@example.test' };
+        signedIn = otherUser;
+
+        await router.push('/account?user_id=' + fixtureUser.id);
+        await flushPromises();
+
+        expect(auth.user).toEqual(otherUser);
+        expect(wrapper.text()).toContain(otherUser.email);
+        expect(wrapper.text()).not.toContain(fixtureUser.email);
     });
 
     it.each([429, 500])(

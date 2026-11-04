@@ -53,6 +53,12 @@ replay after logout. They use transactional user records in the guarded test dat
 Vue authentication tests use real Pinia/router instances with mocked HTTP responses.
 See [authentication.md](authentication.md) for the flow and security boundaries.
 
+Authorization tests cover direct guest requests, public routes, two-user account
+identity and unsupported private paths. The authentication suite switches between
+two independent cookie sessions to verify that forged identifiers cannot switch or
+invalidate another user's session. Future resource features must add real ownership
+and policy tests; [authorization.md](authorization.md) defines the required cases.
+
 Build the frontend before the backend production-asset test:
 
 ```bash
