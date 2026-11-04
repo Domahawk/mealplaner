@@ -12,8 +12,9 @@ commands, and detailed safeguards are documented in [testing.md](testing.md).
 
 The sections below retain the TASK-04 inspection/results. Their narrower integration
 suite and SQLite-default Composer command describe that historical state; the current
-commands above supersede it. The pending TASK-05 development-table cleanup remains
-separate and has not been performed by automated tests.
+commands above supersede it. The TASK-05 development-table cleanup was completed on 2026-11-04 after explicit
+approval and locked empty checks, separately from automated tests. The original
+zero-table state is restored and migration history remains uninitialized.
 
 ## Initial TASK-04 inspection — 2026-11-02
 
@@ -79,9 +80,9 @@ docker compose exec -T --user app backend php artisan migrate:status
 ```
 
 Development result: **Migration table not found**. TASK-04 found no user relations.
-The initial TASK-05 lifecycle probe mistakenly created two empty cache tables; their
-targeted removal awaits approval. See the
-[incident record](VERIFICATION.md#verification-incident--cleanup-awaiting-approval)
+The initial TASK-05 lifecycle probe mistakenly created two empty cache tables. Their
+approved removal on 2026-11-04 restored the zero-table state. See the
+[incident record](VERIFICATION.md#verification-incident-and-approved-cleanup)
 before development schema work. This is reported as uninitialized migration history, not as a failed
 connection. The existing cache migration uses Laravel Schema Builder and passed on
 both SQLite and PostgreSQL; its bytes were not modified.

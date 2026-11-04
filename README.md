@@ -9,10 +9,12 @@ TypeScript under `resources/js`, a Blade HTML entry, and Laravel's Vite plugin.
 The browser uses same-origin REST endpoints. Production is one application deployment;
 Node/Vite provide development assets and build the frontend bundle.
 
-**CI status:** [Project Foundation CI](.github/workflows/ci.yml) is configured for
-pushes, pull requests, and manual runs. A passing GitHub-hosted run has **not yet been
-verified**; this checkout has no GitHub remote. See [CI status and troubleshooting](docs/ci.md).
-Local foundation verification is recorded in [VERIFICATION.md](docs/VERIFICATION.md).
+[![Project Foundation CI](https://github.com/Domahawk/mealplaner/actions/workflows/ci.yml/badge.svg)](https://github.com/Domahawk/mealplaner/actions/workflows/ci.yml)
+
+**CI status:** [Project Foundation CI](.github/workflows/ci.yml) passed on GitHub for
+main commit `8069f92`; [verified run](https://github.com/Domahawk/mealplaner/actions/runs/41769545670). It runs on pushes, pull requests, and
+manual dispatch. See [CI status and troubleshooting](docs/ci.md) and the
+[verification record](docs/VERIFICATION.md) for scope and results.
 
 ## Current capabilities and MVP scope
 
@@ -285,9 +287,10 @@ migrations and commit/reconnect persistence, and removes only those test resourc
 It no longer recreates PostgreSQL. `pdo_pgsql` is required and available.
 
 TASK-04 preserved the development database and local environment. During TASK-05,
-an initial verification probe mistakenly created two empty cache tables; targeted
-cleanup is awaiting approval. No existing records were changed or deleted. See the
-[incident record](docs/VERIFICATION.md#verification-incident--cleanup-awaiting-approval)
+an initial verification probe mistakenly created two empty cache tables. Both were
+removed on 2026-11-04 after explicit approval, locks, and empty-table checks, restoring
+the original zero-table state. No existing records were changed or deleted. See the
+[incident record](docs/VERIFICATION.md#verification-incident-and-approved-cleanup)
 before any development schema work. Migration history remains uninitialized. `.env.example` now uses nonsecret Mealplaner database
 placeholders with a blank password. Keep `DB_HOST=postgres` inside the existing Compose
 network; use `127.0.0.1` only for an appropriate host-reachable database. The current

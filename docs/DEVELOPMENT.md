@@ -53,12 +53,12 @@ method, and existing dependency advisories. No additional dependencies were intr
 
 ## Docker setup from a fresh clone
 
-**Existing development database warning:** the initial TASK-05 verification probe
-created two empty cache tables in the original development database; a new clone with
-new volumes does not inherit that state. Their targeted removal awaits approval. See the
-[incident record](VERIFICATION.md#verification-incident--cleanup-awaiting-approval)
-before any development schema changes. New-clone setup below does not authorize
-resetting an existing database.
+**Existing development database:** the two empty tables accidentally created during
+TASK-05 were removed on 2026-11-04 after explicit approval, locks, and empty-table
+checks. The original zero-table state is restored; migration history remains
+uninitialized. See the [incident record](VERIFICATION.md#verification-incident-and-approved-cleanup).
+Inspect and confirm any existing database before applying migrations; cleanup does
+not authorize initializing an existing database automatically.
 
 Docker Engine and Docker Compose v2 with `--wait` support are the only required host
 runtimes. PHP, Composer, Node/npm, and PostgreSQL run in containers. Use the root
@@ -229,7 +229,8 @@ coverage child. Install the locked frontend dependencies after pulling coverage 
 HTML/XML/LCOV output is under ignored `coverage/`; JUnit reports are in `test-results/`.
 See [testing.md](testing.md) for exact commands, guard ordering, conventions, artifact
 paths, and a non-interactive GitHub Actions sequence. See [database.md](database.md)
-for development migration rules. The pending TASK-05 cleanup remains separate.
+for development migration rules. The TASK-05 cleanup was completed with explicit approval; automated tests never
+authorize changing development data.
 
 ## Hot reload and environment changes
 
@@ -361,7 +362,9 @@ all four services, locked dependency installation, quality/tests/builds, real br
 HMR, and a committed record surviving Laravel restart and PostgreSQL recreation.
 Only the dedicated verification record was removed. The temporary stack was stopped
 without volume deletion; the original development stack/database were not used.
-The hosted GitHub run is still unverified and the original TASK-05 cleanup is pending.
+The hosted GitHub run and the approved TASK-05 cleanup are verified; see the dated
+follow-up in [VERIFICATION.md](VERIFICATION.md). Enforcing SELinux was not rechecked
+on the host that reported Disabled.
 
 ## Updates
 

@@ -95,7 +95,8 @@ Independent runner invocations generate different identities. Parallel PHPUnit w
 setup is not configured; do not add parallel flags or suffix databases until each
 worker has equivalent provisioning and guards. Provisioning or cleanup failures return
 nonzero status; fix permissions/connectivity rather than falling back to development.
-The pending TASK-05 development-table cleanup is separate and is not authorized by tests.
+The TASK-05 development-table cleanup was completed after explicit approval on
+2026-11-04. Automated tests never authorize changing development tables.
 
 ## Coverage and reports
 
@@ -135,8 +136,8 @@ reports or put secrets in fixtures.
 ## GitHub Actions and local reproduction
 
 The implemented [workflow](../.github/workflows/ci.yml) runs these scripts on pushes,
-pull requests, and manual dispatch. Native GitHub execution remains unverified;
-[ci.md](ci.md) documents the isolated service, caching, action pins, and hosted status.
+pull requests, and manual dispatch. A passing GitHub-hosted run is verified; [ci.md](ci.md) documents its evidence, the
+isolated service, caching, and action pins.
 After preparing the existing Docker environment, reproduce its checks with:
 
 ```bash

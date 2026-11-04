@@ -7,25 +7,31 @@ and manual `workflow_dispatch`. The single check is named **Verify foundation**.
 It does not deploy, publish a release, or modify repository settings. All tool commands
 reuse the scripts documented in [testing.md](testing.md) and [README.md](../README.md).
 
-**Hosted status:** workflow implementation and local validation are recorded in
-[VERIFICATION.md](VERIFICATION.md). A passing GitHub-hosted run has not yet been
-verified. This checkout has no GitHub origin or authenticated GitHub integration;
-there is no verified repository/run URL to link or use for a status badge. Do not
-interpret local command results as GitHub Actions execution or mark BL-01 complete
-until the uploaded workflow passes for the actual commit on GitHub.
+**Hosted status:** [verified GitHub run](https://github.com/Domahawk/mealplaner/actions/runs/41769545670) passed for main commit
+`8069f928733dfc904194c088ff6753607d57767d`. Public GitHub metadata confirms every
+required quality/test/build step, both dependency-cache save steps, and report upload
+succeeded. Two nonempty dependency caches and the nonexpired `foundation-reports`
+artifact were also verified. The run's workflow contents match the committed source. A controlled hosted failure
+on the publication branch also confirmed that a failed required backend test fails
+the job even when report upload succeeds; its temporary probe is removed.
+See [VERIFICATION.md](VERIFICATION.md) for dated evidence and local checks.
 
-Publishing requires a GitHub repository and explicit commit/push authorization under
-`AGENTS.md`. Once published, inspect **Actions → Project Foundation CI** for the exact
-commit, required check result, and report artifact. Configure branch protection to
-require **Verify foundation** separately if wanted; this task does not change settings.
+Repository: [Domahawk/mealplaner](https://github.com/Domahawk/mealplaner). Publishing uses the configured SSH origin;
+web/API links here identify verification results. The user authorized publishing a new
+branch and the conditional empty-table cleanup on 2026-11-04. Main is not modified by
+that branch publication. The completed cleanup is recorded separately; tests retain
+their existing isolation rules.
+
+Inspect [Actions](https://github.com/Domahawk/mealplaner/actions/workflows/ci.yml) for the exact commit and **Verify foundation** result.
+Branch protection settings remain unchanged. Authentication/domain features and
+production deployment are outside this foundation workflow.
 
 ## What the job runs
 
 One Ubuntu 24.04 job uses PHP **8.5**, Composer **2.10.3**, Node **24**, and an
 independent PostgreSQL **18.6** service. These PHP/Node majors satisfy the root
-manifests and match the local Docker runtime families. Hosted patch resolution and
-setup-action execution require the first real GitHub run; local container versions
-are recorded separately.
+manifests and match the local Docker runtime families. The hosted setup steps passed; local container patch versions
+are recorded separately from the workflow's supported runtime families.
 
 The job performs these serial steps:
 
@@ -136,9 +142,9 @@ configured and no host security policy was changed. Named-volume persistence acr
 not a backup/restore or volume-loss guarantee. Never use database resets or volume
 removal to validate durability.
 
-A first passing hosted workflow remains required for TASK-08's Definition of Done.
-The pending TASK-05 cleanup of accidentally created development tables also remains
-separate; validation here does not authorize that schema change. Authentication and
+The first passing hosted workflow is verified, and the TASK-05 empty-table cleanup
+was completed after explicit authorization. Future schema changes still require their
+own scope; testing never authorizes modifying development data. Authentication and
 Mealplaner domain features are later MVP work, not BL-01 foundation implementations.
 
 Primary references: [GitHub PostgreSQL services](https://docs.github.com/en/actions/tutorials/use-containerized-services/create-postgresql-service-containers),

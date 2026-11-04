@@ -174,8 +174,10 @@ deliberately left untouched because it was not confirmed newly created/dedicated
 PostgreSQL test database, including commit/reconnect persistence. TASK-04 used no reset or PostgreSQL restart. TASK-05 additionally checks ordinary
 container recreation on the original named volume using a restricted test identity;
 see [VERIFICATION.md](VERIFICATION.md) for its results and the initial probe incident.
-That initial probe created two empty development cache tables; targeted cleanup is
-awaiting approval. Existing migration history and records were not changed.
+That initial probe created two empty development cache tables. Explicitly approved
+cleanup on 2026-11-04 removed only those tables after locked empty checks, restoring
+zero user relations. Migration history remains uninitialized; no existing records
+were changed.
 `/api/health` remains operational without a database; `/api/ready` checks connectivity.
 See [database.md](database.md) for the full workflow and bounded verification results.
 
@@ -293,7 +295,8 @@ installation behavior was not tested by this audit.
 There is no verified cloud deployment. TASK-08 adds `.github/workflows/ci.yml` for
 push/PR checks on the same root application, with PHP 8.5, Node 24, isolated PostgreSQL,
 lockfile installs/caches, existing scripts, and report upload. Its first hosted run
-is unverified because this checkout has no GitHub remote; see [ci.md](ci.md). Provider-specific
+for `8069f92` passed, including quality/tests/build, dependency-cache saves, and report
+upload; see [ci.md](ci.md). Provider-specific
 instructions must be reviewed at deployment time, especially secret-handling steps:
 the permanent instructions forbid displaying keys or inspecting credential values.
 Development Compose configuration is not the production deployment contract.
