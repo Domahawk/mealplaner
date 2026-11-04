@@ -148,21 +148,28 @@ titles; the root shell updates the document title and focuses the main region af
 client navigation. A keyboard-visible skip link targets that same region. Laravel must serve the SPA entry for client deep links while retaining
 JSON API errors and separate static/framework handling. New server namespaces must
 be excluded from both the Laravel SPA fallback and the Workbox navigation fallback.
-There are no authentication guards or protected domain routes.
+No frontend authentication guards or protected domain routes are configured.
 
 ## Authentication and future authorization
 
 Authentication is **not implemented**: there are no registration/login/logout routes,
-User model, user migration, application auth configuration, or installed auth packages.
-File-session settings alone do not constitute authentication. Do not assume Sanctum
-is installed because `sanctum` appears in namespace exclusions.
+User model, user migration, application-owned auth configuration, or installed auth
+packages. Laravel 13 supplies native configuration defaults, including a session
+guard and an Eloquent provider whose default User model is absent. File-session
+settings alone do not constitute authentication. Do not assume Sanctum is installed
+because `sanctum` appears in namespace exclusions.
 
 Future authentication should extend Laravel-native authentication and the existing
 same-origin SPA: server-owned sessions, framework password hashing, CSRF protection,
-and server-side authorization. The authentication task must establish the guard,
-provider, user persistence, and whether Sanctum is needed; it must not introduce a
+and server-side authorization. The authentication task must complete the guard/provider
+integration and user persistence; it must not introduce a
 parallel application or custom token scheme incidentally. User-owned domain data
 and referenced products/recipes will need ownership checks before those features ship.
+
+The [TASK-09 authentication audit](authentication-audit.md) records the verified
+middleware, hashing and anonymous session behavior, missing account flows, frontend
+state boundaries, and security prerequisites. It does not establish authenticated
+reload persistence or protected Vue routing; those capabilities do not exist yet.
 
 ## Persistence and environment
 

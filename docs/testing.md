@@ -42,6 +42,11 @@ The PHP runner accepts only the optional `--coverage` flag. `php artisan test` s
 uses `phpunit.xml` and SQLite memory storage; it is not the canonical PostgreSQL run.
 Vitest's `test`/`test:unit` scripts use `vitest run`, never watch mode.
 
+The [authentication audit tests](authentication-audit.md) deliberately override the
+default array session driver with file sessions in a private temporary directory.
+They clean up their own files and never use development session storage. Their
+probe routes and forced CSRF validation exist only in the test application.
+
 Build the frontend before the backend production-asset test:
 
 ```bash

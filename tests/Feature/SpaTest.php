@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class SpaTest extends TestCase
@@ -45,5 +46,15 @@ class SpaTest extends TestCase
     public function test_post_requests_do_not_return_the_spa(): void
     {
         $this->postJson('/about')->assertStatus(405);
+    }
+
+    public function test_unsigned_private_uploads_are_rejected_without_writing_a_file(): void
+    {
+        Storage::fake('local');
+
+        $this->putJson('/storage/audit-rejected-upload.txt', ['value' => 'audit-only-fixture'])
+            ->assertForbidden();
+
+        Storage::disk('local')->assertMissing('audit-rejected-upload.txt');
     }
 }
