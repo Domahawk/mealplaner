@@ -1,5 +1,58 @@
 # Verification record
 
+## TASK-09 — authentication audit (2026-11-04)
+
+The [authentication audit](authentication-audit.md) inspected registration/login/logout
+capabilities, routes and middleware, framework auth/hashing defaults, session/CSRF
+behavior, and Vue routing/state. **Account authentication is absent**, including
+the User model/schema and account endpoints/UI. Native framework services are
+available; their availability is not evidence of implemented account flows.
+
+Added 12 test cases: synthetic password hashing/checks, anonymous file-session
+persistence across a fresh application instance, cookie attributes and tampering,
+CSRF rejection/acceptance, guest JSON rejection on a test-only protected route,
+and unsigned private upload rejection without a file write. Test routes exist only
+inside PHPUnit. File sessions use private temporary test directories, never the
+development session directory. The CSRF tests disable only Laravel's testing
+shortcut; testing mode and database guards remain enabled.
+
+All commands below ran in the existing Docker containers. Backend commands use
+`docker compose exec -T --user app backend`; frontend commands use
+`docker compose exec -T --user node frontend`.
+
+| Command                  | Actual result                                                                                     |
+| ------------------------ | ------------------------------------------------------------------------------------------------- |
+| `composer quality`       | Passed: Pint, 37 files; PHPStan/Larastan, no errors.                                              |
+| `composer test`          | Passed: 46 tests, 608 assertions on a generated restricted PostgreSQL test database.              |
+| `composer test:coverage` | Passed: 46 tests, 608 assertions; Clover/HTML generated, app/routes line coverage 96.77% (30/31). |
+| `composer test:sqlite`   | Passed: 41 tests, 283 assertions; SQLite memory-only.                                             |
+| `npm run quality`        | Passed: zero-warning ESLint, Prettier check, strict Vue TSC.                                      |
+| `npm run test:unit`      | Passed: 12 tests across two files, including existing public component/routing behavior.          |
+| `npm run build`          | Passed: Vue TSC and Vite production build; PWA output generated.                                  |
+| `npm run verify:build`   | Passed: production entry, CSS, offline shell, manifest, worker and icons.                         |
+
+The initial session-persistence test failed because Laravel's JSON test client
+omits cookies by default. Enabling credentials in that test harness fixed the
+failure; no application setting was changed. The full suite then passed on both
+database configurations. PostgreSQL runners removed only their generated databases
+and logins; no development tables, credentials, migrations or records were changed.
+
+Read-only live HTTP checks against `127.0.0.1:8000` verified:
+
+- `/`, `/about` and `/login`: HTTP 200 with the SPA entry. `/login` is an unknown
+  client route, not an implemented login form.
+- `/api/health`: HTTP 200, JSON `{"status":"ok"}`.
+- `/api/ready`: HTTP 200, JSON `{"status":"ok","database":"connected"}`.
+- `/up`: HTTP 200.
+- `/api/_audit/session` and `/api/_audit/protected`: HTTP 404 JSON, confirming the
+  test-only probe routes are unavailable in the running application.
+
+Authenticated reload persistence, successful account flows and protected Vue
+navigation could not be verified because they do not exist. No new browser/HMR
+test, hosted CI run, production assessment, dependency installation, environment
+change, application-code change, Git commit or push was performed for TASK-09.
+The final diff contains tests and documentation only.
+
 ## Hosted CI and approved cleanup follow-up (2026-11-04)
 
 **Current status:** the first GitHub-hosted foundation run is verified, and the

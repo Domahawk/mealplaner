@@ -25,6 +25,11 @@ Existing Pinia-backed light/dark/system preferences, the user-triggered API/data
 connection check, Laravel liveness, and production PWA build/update support are preserved.
 No Inertia, Livewire, or authentication package is installed.
 
+The [TASK-09 authentication audit](docs/authentication-audit.md) confirms that native
+hashing, session cookies and web CSRF protection are available and tested.
+Registration, login/logout, user persistence, protected routes and frontend auth state
+are still missing. The session test verifies anonymous persistence only.
+
 Planned MVP capabilities, **not yet implemented**:
 
 1. Register, log in, and log out.
@@ -313,6 +318,8 @@ setup, and its HMR test temporarily edits source. Do not remove database volumes
 - [AGENTS.md](AGENTS.md): permanent architecture, coding, verification, and safety rules.
 - [Architecture](docs/architecture.md): integration, routing, ownership direction,
   infrastructure, detected versions, decisions, and technical debt.
+- [Authentication audit](docs/authentication-audit.md): existing security primitives,
+  test coverage, missing account flows and subsequent implementation requirements.
 - [CI guide](docs/ci.md): workflow triggers, isolation, runtimes, caching, reports,
   local reproduction, hosted-status limits, and troubleshooting.
 - [Testing guide](docs/testing.md): canonical PostgreSQL tests, safe Laravel utilities,
