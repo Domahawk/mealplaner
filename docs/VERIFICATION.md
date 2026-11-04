@@ -1,9 +1,76 @@
 # Verification record
 
+## Hosted CI and approved cleanup follow-up (2026-11-04)
+
+**Current status:** the first GitHub-hosted foundation run is verified, and the
+TASK-05 empty-table cleanup is complete. The implementation and foundation checks
+are verified within the recorded scope; enforcing SELinux, backup/volume-loss recovery,
+and real device installation remain outside this follow-up's verified results.
+
+The user supplied `git@github-dmwhk.com:Domahawk/mealplaner.git` and explicitly
+authorized new-branch publishing and removal of the two accidentally created tables
+only if they remained empty. SSH access works through that configured alias; no key,
+token, local environment value, or credential was inspected or displayed.
+
+### Hosted evidence
+
+- Repository: [Domahawk/mealplaner](https://github.com/Domahawk/mealplaner).
+- [Project Foundation CI run 41769545670](https://github.com/Domahawk/mealplaner/actions/runs/41769545670) completed successfully for main
+  commit `8069f928733dfc904194c088ff6753607d57767d`, triggered by a push.
+- The hosted workflow file matches that committed workflow byte for byte.
+- **Verify foundation** and every required setup, locked install, quality, production
+  build, backend/frontend coverage, and upload step succeeded. Both post-cache save
+  steps succeeded too.
+- GitHub cache metadata contains two nonempty caches: npm **40,729,760 bytes** and
+  Composer downloads **41,515,884 bytes**, associated with the main branch.
+- `foundation-reports` artifact **13294272657** exists, is not expired, and contains
+  **426,054 bytes**. This verifies hosted report upload in addition to local generation.
+
+### Hosted failure-handling verification
+
+On the authorized branch, temporary commit
+`04e3916dcfdd37ce160e4a36d16fec47fd9e9375` contained one intentionally failing
+PHPUnit test. [Run 41771544971](https://github.com/Domahawk/mealplaner/actions/runs/41771544971)
+verified that installation, PHP/frontend quality, and production build succeeded,
+then **Backend tests and coverage** and **Verify foundation** failed. The later
+frontend test step was skipped and report upload still succeeded, proving upload did
+not mask the required failure. The probe is removed in this follow-up; no application
+or workflow rule was weakened. Final branch verification follows publication of the
+clean source, and its latest status is available in
+[branch runs](https://github.com/Domahawk/mealplaner/actions?query=branch%3Aci%2Fverify-project-foundation).
+
+A new branch, `ci/verify-project-foundation`, carries these documentation updates.
+Its push-triggered run is checked after publication; the evidence above identifies
+the already verified main run and does not predict the new branch's result. No merge,
+production deployment, or repository-settings change is authorized or performed.
+
+### Approved database cleanup
+
+The pre-cleanup inspection found exactly the two original tables and their primary-key
+indexes; both table row counts were zero and no migration repository existed. Cleanup
+ran with `ACCESS EXCLUSIVE` locks and `NOWAIT`, rechecked the exact table/column
+structure and zero counts, then dropped only `public.cache` and `public.cache_locks`
+without CASCADE in one transaction. Post-cleanup inspection found **zero user relations**.
+No existing records, unrelated tables, database, role, volume, or migration history
+were deleted/reset. No development migrations were run.
+
+An initial catalog-expression type check aborted before any changes; explicit catalog
+type casting corrected that check, and the locked cleanup then completed. The operation
+was scoped to the user-approved tables and could not proceed if their state changed.
+
+Post-cleanup local checks passed: both Docker quality gates, **34 backend tests /
+420 assertions**, and actual HTTP `/up`, `/api/health`, and `/api/ready` returned 200.
+Fresh metadata checks confirmed `cache`, `cache_locks`, and `migrations` remain absent.
+The existing migration history was preserved rather than initialized incidentally.
+
+The historical sections below record the original unavailable-remote and approval
+holds. Those holds are resolved by this dated follow-up; current setup guides and
+README now link the verified hosted status and completed cleanup.
+
 ## TASK-08 — CI and foundation verification (2026-11-03)
 
-**Overall status: locally verified; GitHub-hosted execution unverified. BL-01 is not
-marked complete.** No GitHub remote is configured in this checkout and no authenticated
+**Status at the end of the initial 2026-11-03 session (superseded by the follow-up above):
+locally verified; GitHub-hosted execution was then unverified.** No GitHub remote is configured in this checkout and no authenticated
 GitHub integration/CLI is available. The workflow has not been committed/pushed or
 observed running on GitHub. The independent TASK-05 development-table cleanup also
 remains pending explicit approval.
@@ -220,7 +287,15 @@ Node 24.22.2/npm 11.19.1, PostgreSQL 18.6, and Nginx 1.30.6. The PHP extensions,
 FPM/Nginx integration, shared SELinux labels, dependency/cache volumes, and loopback
 ports remain in use. Vite gains an init process; PostgreSQL has a 30-second stop window.
 
-### Verification incident — cleanup awaiting approval
+<a id="verification-incident--cleanup-awaiting-approval"></a>
+
+### Verification incident and approved cleanup
+
+**Resolved on 2026-11-04:** the user approved removal only while both tables were
+empty. Exclusive locks and fresh structure/row-count checks confirmed that condition;
+only `cache` and `cache_locks` were dropped without CASCADE in a transaction. Zero
+user relations remain, matching the state before the incident. The paragraphs below
+retain the original incident and approval hold; the dated follow-up above is current.
 
 The first temporary lifecycle probe booted Laravel with development credentials and
 attempted a migration on a separately named test connection. This did not isolate
@@ -232,9 +307,9 @@ modified or deleted. The failed probe's generated test database/login were remov
 
 The probe was stopped and its unsafe temporary script removed. Approval was requested
 to restore the original development schema by removing only those two empty tables,
-after locking and rechecking them, without CASCADE or any reset command. **That
-cleanup has not run and remains pending approval.** Do not treat development migration
-initialization as safe while this discrepancy remains unresolved.
+after locking and rechecking them, without CASCADE or any reset command. **At that time cleanup was awaiting approval.** It was completed under the conditions
+described above on 2026-11-04. Existing migration initialization still requires a
+separate decision after inspecting the target.
 
 The corrected probe provisioned a new random database and restricted login, then
 booted a separate process through `tests/bootstrap.php` with forced testing/array
