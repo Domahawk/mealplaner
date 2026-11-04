@@ -115,6 +115,10 @@ account editing and cross-user domain authorization are outside TASK-10. No doma
 resources exist yet. File sessions retain the configured idle lifetime; they do not
 promise sessions across storage loss or multiple application instances.
 
+TASK-11's [authorization audit and conventions](authorization.md) verify existing
+account isolation and document required policies/scoped queries for future domain
+resources. Unknown `/account/...` paths now return 404 rather than the SPA shell.
+
 Production requires HTTPS, Secure cookies, debug disabled, correctly trusted proxies
 and deliberate shared/durable session and cache storage. Existing local configuration
 was not replaced. These flows are verified locally, not deployed or security-certified.

@@ -29,5 +29,5 @@ Route::get('/sw.js', function () {
 
 // Add backend routes above this route. Reserve framework and static namespaces.
 Route::view('/{path?}', 'app')
-    ->where('path', '(?!(?:api|up|build|storage|icons|sanctum|_ignition|_debugbar|horizon|telescope|livewire)(?:/|$))(?!.*\.[^/]+$).*')
+    ->where('path', '(?!(?:api|up|account|build|storage|icons|sanctum|_ignition|_debugbar|horizon|telescope|livewire)(?:/|$))(?!.*\.[^/]+$).*')
     ->name('spa');

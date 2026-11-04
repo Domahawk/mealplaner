@@ -61,6 +61,7 @@ class AuthenticationTest extends TestCase
     {
         $this->browserRequest('GET', '/api/auth/session')->assertOk()
             ->assertExactJson(['user' => null])->assertHeader('Cache-Control', 'no-store, private');
+        $this->browserRequest('POST', '/api/auth/logout')->assertUnauthorized();
         $this->browserRequest('GET', '/api/auth/user')->assertUnauthorized();
         $this->get('/account')->assertRedirect('/login');
         $this->get('/login')->assertOk()->assertSee('<div id="app"></div>', false);
@@ -209,6 +210,57 @@ class AuthenticationTest extends TestCase
         $this->browserRequest('POST', '/api/auth/login', $this->registration())->assertStatus(409);
         $this->browserRequest('POST', '/api/auth/register', array_replace($this->registration(), ['email' => 'other@example.test']))->assertStatus(409);
         $this->assertDatabaseCount('users', 1);
+    }
+
+    public function test_registration_cannot_overwrite_another_user_through_supplied_identifiers(): void
+    {
+        $existing = User::create(['name' => 'Existing Fixture', 'email' => 'existing@example.test', 'password' => self::PASSWORD]);
+        $this->browserRequest('GET', '/api/auth/session');
+
+        $response = $this->browserRequest('POST', '/api/auth/register', array_merge($this->registration(), [
+            'id' => (string) $existing->id,
+            'user_id' => (string) $existing->id,
+            'owner_id' => (string) $existing->id,
+        ]));
+
+        $response->assertCreated()->assertJsonPath('user.email', 'planner@example.test');
+        $this->assertNotSame($existing->id, $response->json('user.id'));
+        $this->assertSame('Existing Fixture', $existing->refresh()->name);
+        $this->assertSame('existing@example.test', $existing->email);
+        $this->assertDatabaseCount('users', 2);
+    }
+
+    public function test_forged_user_ids_cannot_switch_identity_or_log_out_another_session(): void
+    {
+        $alice = $this->createUser();
+        $bob = User::create(['name' => 'Bob Fixture', 'email' => 'bob@example.test', 'password' => self::PASSWORD]);
+
+        $this->browserRequest('GET', '/api/auth/session');
+        $aliceLogin = $this->browserRequest('POST', '/api/auth/login', $this->registration());
+        $aliceCookie = $aliceLogin->getCookie(config('session.cookie'), false)->getValue();
+        $aliceXsrf = $this->xsrf;
+
+        // A separate browser cookie jar starts Bob's independent authenticated session.
+        $this->withUnencryptedCookie(config('session.cookie'), '');
+        $this->xsrf = null;
+        $this->browserRequest('GET', '/api/auth/session');
+        $bobLogin = $this->browserRequest('POST', '/api/auth/login', [
+            'email' => $bob->email, 'password' => self::PASSWORD, 'user_id' => (string) $alice->id,
+        ])->assertOk()->assertJsonPath('user.id', $bob->id);
+        $bobCookie = $bobLogin->getCookie(config('session.cookie'), false)->getValue();
+        $bobXsrf = $this->xsrf;
+
+        $this->withUnencryptedCookie(config('session.cookie'), $aliceCookie);
+        $this->xsrf = $aliceXsrf;
+        $this->browserRequest('POST', '/api/auth/logout', ['user_id' => (string) $bob->id])
+            ->assertNoContent();
+        $this->browserRequest('GET', '/api/auth/user')->assertUnauthorized();
+
+        $this->withUnencryptedCookie(config('session.cookie'), $bobCookie);
+        $this->xsrf = $bobXsrf;
+        $this->browserRequest('GET', '/api/auth/user?user_id='.$alice->id)
+            ->assertOk()->assertJsonPath('user.id', $bob->id);
+        $this->assertDatabaseCount('users', 2);
     }
 
     /** @return array<string, string> */

@@ -31,6 +31,11 @@ account navigation are tested. See [authentication](docs/authentication.md) for 
 validation, throttling and limitations; the [TASK-09 audit](docs/authentication-audit.md)
 records the earlier baseline.
 
+[Authorization conventions](docs/authorization.md) define server-side route protection,
+session-owned identity and the scoped queries/Policies required for future resources.
+Two-user tests verify existing account boundaries. Unknown `/account/...` paths
+return 404; products, recipes and food logs have no endpoints or policies yet.
+
 Planned MVP capabilities, **not yet implemented**:
 
 1. Create, view, edit, and delete user-owned products with nutritional information.
@@ -264,6 +269,12 @@ unrelated application feature is introduced.
 
 ## Verification commands and current results
 
+TASK-11 verifies current authorization boundaries: **70 PostgreSQL tests / 1,105
+assertions**, **65 optional SQLite tests**, **26 frontend tests**, quality gates,
+coverage and production build validation. Tests cover guest denial, two-user account
+isolation, forged identifiers and stale browser state. Domain ownership tests will
+be added with their actual features. See the [current verification record](docs/VERIFICATION.md#task-11--authorization-2026-11-04).
+
 TASK-10 passes **58 PostgreSQL backend tests / 879 assertions**, **53 optional
 SQLite tests**, **23 frontend tests**, both quality gates, coverage and production
 build validation. Chrome verified the complete account flow and authenticated reloads
@@ -334,6 +345,8 @@ setup, and its HMR test temporarily edits source. Do not remove database volumes
   test coverage, missing account flows and subsequent implementation requirements.
 - [Authentication](docs/authentication.md): current registration/login/logout flows,
   session/CSRF handling, validation, throttling, setup and test conventions.
+- [Authorization](docs/authorization.md): current route audit, account access tests,
+  IDOR prevention and required Policies/scoped queries for future owned resources.
 - [CI guide](docs/ci.md): workflow triggers, isolation, runtimes, caching, reports,
   local reproduction, hosted-status limits, and troubleshooting.
 - [Testing guide](docs/testing.md): canonical PostgreSQL tests, safe Laravel utilities,

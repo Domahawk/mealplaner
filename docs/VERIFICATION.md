@@ -1,5 +1,83 @@
 # Verification record
 
+## TASK-11 — authorization (2026-11-04)
+
+Started with a clean tree on local `main` at `406643b`; created and switched to
+**`feature/task-11-authorization` from local `main` before editing**. Existing
+session authentication, route middleware, requests, controller, model, Gate/policy
+usage, Vue state/guards and storage access were inspected.
+
+The effective `auth` alias is Laravel's native `Authenticate`. Web middleware retains
+encrypted cookies, sessions, request-forgery prevention and bindings. The API group
+contains bindings only; existing account JSON routes intentionally use the web stack.
+No User policy or domain resource endpoints exist. The current account uses only
+server-session identity, so a policy for arbitrary-user lookup would be unused.
+
+### Changes and regression proof
+
+- Reserved `/account` from the public SPA fallback. The new regression test first
+  failed with HTTP 200 for an unknown `/account/...` path; after the route constraint
+  changed, guest and authenticated requests correctly return 404. The original
+  response was an empty public shell, not a demonstrated data leak.
+- Added direct HTTP tests for guest web redirects, JSON/API 401 responses, public
+  routes, two-user identity scoping and unsupported private paths. Existing signed
+  storage rejection tests remain intact.
+- Extended actual session/CSRF tests: registration ignores forged ownership/identity
+  fields without overwriting another user, login uses credentials rather than a
+  supplied user ID, and logging out Alice cannot invalidate Bob's independent session.
+  A guest logout with valid CSRF credentials returns 401.
+- Added Vue tests for an API 401 clearing private content, forged Pinia/localStorage
+  state failing private navigation, and server identity overriding a URL user selector.
+- Added [authorization.md](authorization.md) and mandatory AGENTS conventions for
+  user-scoped queries, server-owned relationships, action Policies, foreign-reference
+  validation and 401/403/404 contracts. Policy examples are documentation only;
+  products, recipes, food logs, placeholder models and migrations were not created.
+
+### Executed checks
+
+PHP commands used `docker compose exec -T --user app backend`; frontend commands
+used `docker compose exec -T --user node frontend` in the existing containers.
+
+| Command                                  | Result                                                                                                        |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `composer test`                          | Passed after the route fix: 70 tests, 1,104 assertions.                                                       |
+| `composer test:coverage`                 | Final full suite passed: 70 tests, 1,105 assertions; PHP line coverage 98.78% (81/82). Clover/HTML generated. |
+| `composer test:sqlite`                   | Passed: 65 tests, 588 assertions, SQLite memory-only.                                                         |
+| `composer quality`                       | Passed: Pint checks 45 files; PHPStan/Larastan reports no errors.                                             |
+| `npm run test:unit`                      | Initial expanded suite passed: 25 tests.                                                                      |
+| `npm run test:coverage`                  | Final expanded suite passed: 26 tests; 88.47% line coverage, HTML/LCOV/summary generated.                     |
+| `npm run quality`                        | Passed: zero-warning ESLint, Prettier and strict Vue TSC.                                                     |
+| `npm run build` / `npm run verify:build` | Passed: type-checked Vite/PWA build and asset validation.                                                     |
+
+Read-only live HTTP requests to `127.0.0.1:8000`, without automatic redirects,
+confirmed `/account` gives **302 to `/login` for HTML** and **401 JSON for JSON**.
+`/api/auth/user` returns **401 JSON even with Accept: text/html**. Unknown account
+and account-API paths give **404**; login, registration, session bootstrap, health,
+`/up` and ordinary public client deep links retain **200** responses.
+
+Test database bootstrap, actual restricted identity checks and transaction guards
+remain enabled. Test writes and ordinary migrations run only in generated isolated
+databases or memory-only SQLite. Generated PostgreSQL databases/logins are cleaned
+up by the existing runner; file sessions use private temporary test directories.
+No development schema/data, environment values, keys, volumes, dependencies or
+lockfiles were changed. No service restart or new browser/HMR/hosted CI run was needed
+or claimed. No Git commit, push, merge or PR was performed.
+
+Changed files: `routes/web.php`, `tests/Feature/AuthorizationTest.php`,
+`tests/Feature/AuthenticationTest.php`, `tests/frontend/authentication.test.ts`,
+`AGENTS.md`, `README.md`, `docs/authorization.md`, `docs/architecture.md`,
+`docs/authentication.md`, `docs/testing.md` and `docs/VERIFICATION.md`.
+
+### Remaining boundaries
+
+There are no owned products, recipes or logs yet, so their Policies, scoped Eloquent
+relationships and resource-specific cross-user denials cannot be tested as existing
+features. Each future feature must implement and test those rules with its real
+model/endpoints. The current signed storage routes enforce URL capabilities, not
+account ownership; future private files require authorization before URL issuance.
+These limits are explicit in the authorization guide and do not justify placeholder
+production features or a new authentication system.
+
 ## TASK-10 — complete authentication (2026-11-04)
 
 Started with a clean working tree on local `main` at `2ff0596`. Created and switched

@@ -69,6 +69,13 @@ This policy applies to every future Codex development task.
   the server when those features are implemented. Browser checks are not authorization.
 - Preserve native session authentication and the integrated Vue account flows.
   Inspect the implementation before extending it; no Sanctum or token system is used.
+- Follow [authorization.md](docs/authorization.md) when adding user-owned resources.
+  Scope queries to the authenticated user before listing, counting or resolving IDs;
+  create through that user's relationship and never accept ownership from client data.
+  Add the real model's Laravel Policy with the feature and authorize each action.
+  Use 404 for missing/foreign private records and 403 for a forbidden action on a
+  resource the user may see. Validate ownership of referenced records as well.
+  Add guest, owner and cross-user HTTP tests; do not add placeholder models/policies.
 - Keep new backend routes above the SPA fallback and reserve their namespaces in both
   Laravel routing and the PWA navigation fallback when applicable. API errors must
   retain JSON responses and Laravel's standard HTTP status conventions.
