@@ -1,6 +1,20 @@
 <?php
 
+use App\Http\Controllers\AuthenticationController;
 use Illuminate\Support\Facades\Route;
+
+// These same-origin JSON endpoints deliberately use the web session/CSRF stack.
+Route::prefix('api/auth')->controller(AuthenticationController::class)->group(function (): void {
+    Route::get('/session', 'session');
+    Route::get('/user', 'session')->middleware('auth');
+    Route::post('/register', 'register')->middleware('throttle:registration');
+    Route::post('/login', 'login')->middleware('throttle:login');
+    Route::post('/logout', 'logout')->middleware('auth');
+});
+
+Route::view('/login', 'app')->name('login');
+Route::view('/register', 'app')->name('register');
+Route::view('/account', 'app')->middleware(['auth', 'cache.headers:no_store;private'])->name('account');
 
 // Serving the worker at the root gives it the correct scope on every Laravel host.
 Route::get('/sw.js', function () {

@@ -4,6 +4,9 @@ Audited on 2026-11-04 against the existing Laravel 13.39.0 / PHP 8.5.12
 application and integrated Vue 3.5.44 frontend. This task adds tests and
 documentation only; it does not implement authentication.
 
+This is the historical TASK-09 baseline. [TASK-10](authentication.md) subsequently
+implements the account flows and records their current behavior and verification.
+
 ## Findings and requirement status
 
 **Application authentication is not implemented.** Laravel's native authentication,

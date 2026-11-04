@@ -12,8 +12,8 @@ resolved the audit's test/formatting failures without changing this architecture
 TASK-03 reuses the same Vue/Vite foundation, adds Mealplaner content and accessible
 route titles/focus, and verifies the existing development browser/HMR workflow.
 
-The current interface is a reusable starter. Mealplaner's **MVP v0.1.0** domain features
-are planned: registration/login/logout; user-owned nutritional products; recipes and
+TASK-10 completes registration/login/logout within that starter. Mealplaner's
+**MVP v0.1.0** domain features are planned: user-owned nutritional products; recipes and
 quantity-based nutrition calculation; dated consumption records; and daily calorie,
 protein, carbohydrate, and fat totals. None of those features is implemented yet.
 
@@ -59,7 +59,7 @@ mealplaner/
 ├── app/Providers/              # Application service provider
 ├── bootstrap/                  # Laravel bootstrapping and route registration
 ├── config/                     # Laravel environment-based configuration
-├── database/                   # Cache/cache-lock migration and empty seeder
+├── database/                   # Cache/cache-lock and users migrations; empty seeder
 ├── resources/
 │   ├── js/                     # Vue SPA, router, stores, composables, lib, views
 │   ├── css/app.css             # Responsive light/dark application styling
@@ -109,28 +109,29 @@ flowchart LR
 ## Responsibilities and existing capabilities
 
 - **Laravel:** HTML entry delivery, web/API boundaries, JSON exception responses,
-  liveness and database connectivity endpoints. Future validation, authentication,
-  authorization, nutrition calculations, and persistence belong here.
+  liveness/readiness and native account/session authentication. Future domain
+  validation, authorization, nutrition calculations and persistence belong here.
 - **Vue:** Mealplaner Home/about/not-found screens, route titles and keyboard focus,
   navigation, responsive presentation,
   loading/error/success connectivity states, theme preference, and PWA update notice.
   Future user workflows extend these existing components and conventions.
-- **Pinia:** existing `theme` and `connection` stores support real shared state.
+- **Pinia:** `theme`, `connection` and `auth` stores support real shared state.
   The theme follows the system or an explicit persisted browser preference.
-- **HTTP boundary:** `resources/js/lib/api.ts` calls relative `/api/ready` only when
+- **HTTP boundary:** `resources/js/lib/api.ts` handles relative `/api/auth` session
+  actions and calls `/api/ready` only when
   the user requests a connection check. It uses an eight-second timeout, validates
   the response shape, and handles database/network failures. There is no automatic
   connectivity polling or separate frontend API origin to configure.
 - **PostgreSQL:** intended persistent storage, with a configured `pgsql` connection
-  and running development service. Current application database use is a `SELECT 1`
-  connectivity probe, not domain persistence. Laravel includes Eloquent; no domain
+  and running development service. Eloquent persists user accounts; the `SELECT 1`
+  connectivity probe remains. No domain
   models or product/recipe/consumption schema exist yet.
 
 ## Routing
 
 `bootstrap/app.php` registers `routes/web.php`, `routes/api.php` under the standard
 `/api` prefix, console routes, and Laravel's `/up` route. API and JSON-request
-exceptions use JSON rendering. The existing route listing contains seven entries:
+exceptions use JSON rendering. The retained public/framework routes are:
 
 | Route                 | Current behavior                                                                                                                                                                 |
 | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -148,34 +149,35 @@ titles; the root shell updates the document title and focuses the main region af
 client navigation. A keyboard-visible skip link targets that same region. Laravel must serve the SPA entry for client deep links while retaining
 JSON API errors and separate static/framework handling. New server namespaces must
 be excluded from both the Laravel SPA fallback and the Workbox navigation fallback.
-No frontend authentication guards or protected domain routes are configured.
+TASK-10 adds login/register views, a protected account view and frontend session
+checks. Laravel also protects the account entry and `/api/auth/user` with native
+`auth` middleware. Domain resource routes do not exist yet.
 
 ## Authentication and future authorization
 
-Authentication is **not implemented**: there are no registration/login/logout routes,
-User model, user migration, application-owned auth configuration, or installed auth
-packages. Laravel 13 supplies native configuration defaults, including a session
-guard and an Eloquent provider whose default User model is absent. File-session
-settings alone do not constitute authentication. Do not assume Sanctum is installed
-because `sanctum` appears in namespace exclusions.
+TASK-10 implements registration, login and logout using Laravel's native session
+guard, Eloquent User provider and password hashing. The users migration supplies
+account persistence. No new authentication package or token scheme is required.
+Session IDs rotate on login/registration; logout invalidates the session and rotates
+the CSRF token. Validation and native rate limiting protect account submissions.
 
-Future authentication should extend Laravel-native authentication and the existing
-same-origin SPA: server-owned sessions, framework password hashing, CSRF protection,
-and server-side authorization. The authentication task must complete the guard/provider
-integration and user persistence; it must not introduce a
-parallel application or custom token scheme incidentally. User-owned domain data
-and referenced products/recipes will need ownership checks before those features ship.
+The `/api/auth` JSON routes intentionally live in `routes/web.php`, inheriting web
+session/cookie/CSRF middleware. Health routes in `routes/api.php` stay stateless and
+public. Vue uses relative URLs and encrypted XSRF cookie headers; its auth store is
+in memory and restored from the server on reload. API user data is not cached, and
+the PWA fallback excludes `/account`. One root application/deployment remains.
 
-The [TASK-09 authentication audit](authentication-audit.md) records the verified
-middleware, hashing and anonymous session behavior, missing account flows, frontend
-state boundaries, and security prerequisites. It does not establish authenticated
-reload persistence or protected Vue routing; those capabilities do not exist yet.
+[Authentication](authentication.md) describes endpoints, validation and verification.
+The [TASK-09 audit](authentication-audit.md) remains a historical baseline. Future
+user-owned data and referenced products/recipes require server-side ownership checks;
+frontend navigation guards cannot provide authorization. Password reset, email
+verification, remember-me and other account extensions remain outside TASK-10.
 
 ## Persistence and environment
 
 `config/database.php` defaults to PostgreSQL, with an explicitly separate in-memory
-SQLite connection for default tests. Only a framework cache/cache-lock migration
-and an empty seeder are present; TASK-04 preserved both unchanged. Existing
+SQLite connection for default tests. Framework cache/cache-lock and users migrations
+and an empty seeder are present; TASK-04 preserved the initial files unchanged. Existing
 PostgreSQL 18.6 connectivity and `pdo_pgsql` were verified. At TASK-04, development had no user relations or migration repository and was
 deliberately left untouched because it was not confirmed newly created/dedicated. The migration passed in a fresh restricted
 PostgreSQL test database, including commit/reconnect persistence. TASK-04 used no reset or PostgreSQL restart. TASK-05 additionally checks ordinary
@@ -183,8 +185,10 @@ container recreation on the original named volume using a restricted test identi
 see [VERIFICATION.md](VERIFICATION.md) for its results and the initial probe incident.
 That initial probe created two empty development cache tables. Explicitly approved
 cleanup on 2026-11-04 removed only those tables after locked empty checks, restoring
-zero user relations. Migration history remains uninitialized; no existing records
-were changed.
+zero user relations. TASK-10 subsequently confirmed the dedicated local database
+was empty and applied only the new users migration, creating migration history and
+the users table. The cache migration remains pending; local cache/sessions use files.
+Existing records were not changed, and account verification used isolated test databases.
 `/api/health` remains operational without a database; `/api/ready` checks connectivity.
 See [database.md](database.md) for the full workflow and bounded verification results.
 
@@ -224,8 +228,9 @@ shared storage rather than assuming current file sessions are sufficient.
   permissions before running ordinary migrations. Test credentials are ephemeral
   and separate from development; no test environment file is created.
 - Vitest uses JSDOM and Vue Test Utils with real route definitions, fresh Pinia,
-  memory history, a matchMedia stub, and mocked HTTP responses. Twelve tests cover
-  Mealplaner title/welcome/development notice, startup without requests, routing,
+  memory history, a matchMedia stub, and mocked HTTP responses. Twenty-three tests cover
+  account flows and session restoration, Mealplaner title/welcome/development notice,
+  startup without a connectivity check, routing,
   document titles/main focus, theme behavior, loading, connectivity, retries, and
   invalid responses, accessible theme state, and unavailable browser storage. The `matchMedia` fixture now implements its complete typed
   interface instead of asserting through `unknown`.
@@ -330,7 +335,7 @@ Development Compose configuration is not the production deployment contract.
    verification record's missing-lockfile claims have been replaced by this audit.
 6. **Plan missing domain/auth work without scaffolding again.** TASK-03 replaces
    visible starter copy with Mealplaner content; existing local PWA metadata overrides
-   remain configurable. Authentication,
+   remain configurable. TASK-10 completes native session authentication. Resource
    ownership, domain schema, nutrition rules, CI, browser/PWA acceptance, and deployment
    remain scoped future work. `docs/NEW_PROJECT.md` is template-reuse reference, not
    an instruction to initialize another project inside Mealplaner.

@@ -330,6 +330,55 @@ h2 {
     padding: 0;
 }
 
+.auth-view {
+    max-width: 560px;
+    min-height: 550px;
+    padding: 48px 0;
+    overflow-wrap: anywhere;
+}
+.auth-view h1 {
+    font-size: clamp(2rem, 6vw, 3rem);
+    letter-spacing: -1px;
+}
+.auth-form {
+    display: grid;
+    gap: 10px;
+    margin: 24px 0;
+}
+.auth-form input {
+    width: 100%;
+    padding: 12px;
+    font: inherit;
+    color: var(--text);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+}
+.auth-form input:focus-visible,
+.form-error:focus-visible {
+    outline: 3px solid var(--accent);
+    outline-offset: 3px;
+}
+.field-error,
+.field-help,
+.form-error p {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.5;
+}
+.field-error,
+.form-error {
+    color: var(--text);
+    font-weight: 600;
+}
+.field-help {
+    color: var(--muted);
+}
+.auth-form .primary-button {
+    margin-top: 12px;
+    justify-content: center;
+}
+
 @media (max-width: 700px) {
     .app-shell {
         padding: 0 24px;
