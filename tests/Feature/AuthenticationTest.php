@@ -3,10 +3,13 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Contracts\Encryption\Encrypter;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Testing\TestResponse;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -49,10 +52,7 @@ class AuthenticationTest extends TestCase
     protected function tearDown(): void
     {
         if (isset($this->sessionDirectory)) {
-            foreach (glob($this->sessionDirectory.'/*') ?: [] as $file) {
-                unlink($file);
-            }
-            rmdir($this->sessionDirectory);
+            File::deleteDirectory($this->sessionDirectory);
         }
         parent::tearDown();
     }
@@ -263,6 +263,184 @@ class AuthenticationTest extends TestCase
         $this->assertDatabaseCount('users', 2);
     }
 
+    public function test_a_hash_shaped_password_is_hashed_as_plain_input_and_round_trips_through_login(): void
+    {
+        $underlying = 'underlying-password-fixture-123';
+        $password = Hash::make($underlying);
+        $this->browserRequest('GET', '/api/auth/session');
+        $this->browserRequest('POST', '/api/auth/register', array_replace($this->registration(), [
+            'password' => $password, 'password_confirmation' => $password,
+        ]))->assertCreated();
+
+        $stored = User::query()->sole()->password;
+        $this->assertNotSame($password, $stored);
+        $this->assertTrue(Hash::check($password, $stored));
+        $this->assertFalse(Hash::check($underlying, $stored));
+        $this->browserRequest('POST', '/api/auth/logout')->assertNoContent();
+        $this->browserRequest('POST', '/api/auth/login', ['email' => 'planner@example.test', 'password' => $underlying])->assertUnprocessable();
+        $this->browserRequest('POST', '/api/auth/login', ['email' => 'planner@example.test', 'password' => $password])->assertOk();
+    }
+
+    #[DataProvider('sessionLockStores')]
+    public function test_same_session_requests_respect_the_lock_which_serializes_logout(string $store): void
+    {
+        config([
+            'session.block_store' => $store,
+            'cache.stores.file.path' => $this->sessionDirectory.'/cache',
+            'cache.stores.file.lock_path' => $this->sessionDirectory.'/cache',
+        ]);
+        $this->createUser();
+        $this->browserRequest('GET', '/api/auth/session');
+        $login = $this->browserRequest('POST', '/api/auth/login', $this->registration())->assertOk();
+        $id = $login->getCookie(config('session.cookie'))->getValue();
+        $lock = Cache::store(config('session.block_store'))->lock('session:'.$id, 30);
+        $this->assertTrue($lock->get());
+        config(['session.block_wait_seconds' => 0]);
+        $this->getJson('/api/health')->assertOk();
+        $this->withUnencryptedCookie(config('session.cookie'), '');
+        $this->browserRequest('GET', '/api/auth/session')->assertOk()->assertExactJson(['user' => null]);
+        $this->withUnencryptedCookie(config('session.cookie'), $login->getCookie(config('session.cookie'), false)->getValue());
+        $this->withoutExceptionHandling();
+
+        $blocked = false;
+        try {
+            $this->browserRequest('GET', '/api/auth/user');
+        } catch (LockTimeoutException) {
+            $blocked = true;
+        } finally {
+            $lock->release();
+        }
+        $this->assertTrue($blocked, 'A second request must not read/write a session while its lock is held.');
+        $this->withExceptionHandling();
+
+        $this->browserRequest('GET', '/api/auth/user')->assertOk();
+        $this->browserRequest('POST', '/api/auth/logout')->assertNoContent();
+        $this->browserRequest('GET', '/api/auth/user')->assertUnauthorized();
+    }
+
+    /** @return array<string, array{string}> */
+    public static function sessionLockStores(): array
+    {
+        return ['test array cache' => ['array'], 'local file cache' => ['file']];
+    }
+
+    public function test_login_throttle_survives_email_case_and_session_changes_then_expires(): void
+    {
+        $this->createUser();
+        $this->browserRequest('GET', '/api/auth/session');
+        for ($attempt = 0; $attempt < 5; $attempt++) {
+            $email = $attempt % 2 === 0 ? ' PLANNER@EXAMPLE.TEST ' : 'planner@example.test';
+            $this->browserRequest('POST', '/api/auth/login', ['email' => $email, 'password' => 'incorrect-fixture-123'])->assertUnprocessable();
+        }
+
+        $this->withUnencryptedCookie(config('session.cookie'), '');
+        $this->xsrf = null;
+        $this->browserRequest('GET', '/api/auth/session');
+        $this->browserRequest('POST', '/api/auth/login', $this->registration())
+            ->assertStatus(429)->assertHeader('Retry-After');
+        $this->browserRequest('GET', '/api/auth/user')->assertUnauthorized();
+
+        $this->travel(61)->seconds();
+        $this->browserRequest('POST', '/api/auth/login', $this->registration())->assertOk();
+    }
+
+    public function test_login_ip_limit_blocks_breadth_first_attempts_without_blocking_other_ips(): void
+    {
+        $this->browserRequest('GET', '/api/auth/session');
+        for ($attempt = 0; $attempt < 30; $attempt++) {
+            $this->browserRequest('POST', '/api/auth/login', ['email' => 'attempt'.$attempt.'@example.test'])
+                ->assertUnprocessable();
+        }
+        $this->browserRequest('POST', '/api/auth/login', ['email' => 'next@example.test'])->assertStatus(429);
+        $this->getJson('/api/health')->assertOk();
+
+        $this->withServerVariables(['REMOTE_ADDR' => '198.51.100.20']);
+        $this->browserRequest('POST', '/api/auth/login', ['email' => 'next@example.test'])->assertUnprocessable();
+    }
+
+    public function test_rotated_csrf_tokens_cannot_log_out_or_log_back_into_a_session(): void
+    {
+        $this->createUser();
+        $this->browserRequest('GET', '/api/auth/session');
+        $guestXsrf = $this->xsrf;
+        $this->browserRequest('POST', '/api/auth/login', $this->registration())->assertOk();
+        $authenticatedXsrf = $this->xsrf;
+
+        $this->xsrf = $guestXsrf;
+        $this->browserRequest('POST', '/api/auth/logout')->assertStatus(419);
+        $this->browserRequest('GET', '/api/auth/user')->assertOk();
+        $this->xsrf = $authenticatedXsrf;
+        $this->browserRequest('POST', '/api/auth/logout')->assertNoContent();
+
+        $this->xsrf = $authenticatedXsrf;
+        $this->browserRequest('POST', '/api/auth/login', $this->registration())->assertStatus(419);
+        $this->browserRequest('GET', '/api/auth/user')->assertUnauthorized();
+    }
+
+    public function test_an_expired_file_session_cannot_restore_authentication(): void
+    {
+        $this->createUser();
+        $this->browserRequest('GET', '/api/auth/session');
+        $login = $this->browserRequest('POST', '/api/auth/login', $this->registration())->assertOk();
+        $id = $login->getCookie(config('session.cookie'))->getValue();
+        touch($this->sessionDirectory.'/'.$id, time() - (config('session.lifetime') + 1) * 60);
+
+        $this->browserRequest('GET', '/api/auth/user')->assertUnauthorized();
+        $this->browserRequest('GET', '/api/auth/session')->assertExactJson(['user' => null]);
+    }
+
+    #[DataProvider('malformedAccountInputs')]
+    public function test_malformed_credentials_are_validation_errors_and_create_no_account(string $field, mixed $value): void
+    {
+        $this->browserRequest('GET', '/api/auth/session');
+        foreach (['register', 'login'] as $action) {
+            $this->browserRequest('POST', '/api/auth/'.$action, array_replace($this->registration(), [$field => $value]))
+                ->assertUnprocessable()->assertJsonValidationErrors($field);
+        }
+        $this->assertDatabaseCount('users', 0);
+    }
+
+    /** @return array<string, array{string, mixed}> */
+    public static function malformedAccountInputs(): array
+    {
+        return [
+            'email array' => ['email', ['unexpected']],
+            'email null' => ['email', null],
+            'invalid email' => ['email', 'not-an-email'],
+            'password array' => ['password', ['unexpected']],
+            'password number' => ['password', 123456789012],
+        ];
+    }
+
+    #[DataProvider('weakPasswords')]
+    public function test_each_registration_password_requirement_is_enforced(string $password, string $confirmation): void
+    {
+        $this->browserRequest('GET', '/api/auth/session');
+        $this->browserRequest('POST', '/api/auth/register', array_replace($this->registration(), [
+            'password' => $password, 'password_confirmation' => $confirmation,
+        ]))->assertUnprocessable()->assertJsonValidationErrors('password');
+        $this->assertDatabaseCount('users', 0);
+    }
+
+    /** @return array<string, array{string, string}> */
+    public static function weakPasswords(): array
+    {
+        return [
+            'too short' => ['short-123', 'short-123'],
+            'no letters' => ['123456789012345', '123456789012345'],
+            'no numbers' => ['long-password-fixture', 'long-password-fixture'],
+            'confirmation mismatch' => [self::PASSWORD, 'different-fixture-123'],
+        ];
+    }
+
+    public function test_get_requests_cannot_perform_authentication_mutations(): void
+    {
+        foreach (['register', 'login', 'logout'] as $action) {
+            $this->getJson('/api/auth/'.$action)->assertStatus(405);
+        }
+        $this->assertDatabaseCount('users', 0);
+    }
+
     /** @return array<string, string> */
     private function registration(): array
     {
@@ -274,7 +452,7 @@ class AuthenticationTest extends TestCase
         return User::create(['name' => 'Test Planner', 'email' => 'planner@example.test', 'password' => self::PASSWORD]);
     }
 
-    /** @param array<string, string> $fields */
+    /** @param array<string, mixed> $fields Malformed credential fixtures intentionally include non-string values. */
     private function browserRequest(string $method, string $path, array $fields = [], bool $csrf = true): TestResponse
     {
         // Each request must recover identity from the file/cookie, not a cached guard.

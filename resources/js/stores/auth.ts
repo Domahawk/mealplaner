@@ -44,6 +44,10 @@ export const useAuthStore = defineStore('auth', () => {
             if (error instanceof AuthenticationError && [401, 419, 409].includes(error.status)) {
                 initialized.value = false;
                 user.value = null;
+                if (error.status === 409 && action !== 'logout') {
+                    await loadSession();
+                    if (user.value !== null) return;
+                }
             }
             throw error;
         }

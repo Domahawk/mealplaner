@@ -75,7 +75,8 @@ export async function authRequest(
     });
 
     if (response.status === 204 && action === 'logout') return null;
-    const data: unknown = await response.json();
+    // Preserve authentication status handling even for an empty/non-JSON error body.
+    const data: unknown = await response.json().catch(() => null);
     if (!response.ok) {
         const errors: Record<string, string[]> = {};
         if (response.status === 422 && isRecord(data) && isRecord(data.errors)) {

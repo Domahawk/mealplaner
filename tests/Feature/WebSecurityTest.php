@@ -70,6 +70,22 @@ class WebSecurityTest extends TestCase
         $this->getJson(self::PROBE)->assertOk()->assertExactJson(['visits' => 1]);
     }
 
+    public function test_secure_cookie_configuration_applies_to_session_and_xsrf_cookies(): void
+    {
+        config(['session.secure' => true]);
+        $response = $this->getJson('https://localhost'.self::PROBE)->assertOk();
+        $session = $response->getCookie(self::SESSION_COOKIE, false);
+        $xsrf = $response->getCookie('XSRF-TOKEN', false);
+
+        $this->assertNotNull($session);
+        $this->assertNotNull($xsrf);
+        $this->assertTrue($session->isSecure());
+        $this->assertTrue($session->isHttpOnly());
+        $this->assertSame('lax', $session->getSameSite());
+        $this->assertTrue($xsrf->isSecure());
+        $this->assertFalse($xsrf->isHttpOnly());
+    }
+
     /** @param array<string, string> $headers */
     #[DataProvider('invalidCsrfRequests')]
     public function test_web_mutations_reject_invalid_request_forgery_credentials(array $headers): void
