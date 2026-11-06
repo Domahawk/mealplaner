@@ -1,13 +1,20 @@
 # PostgreSQL persistence
 
-## Current account persistence (TASK-10)
+## Current product and account persistence (TASK-13)
 
 The User model and users migration support native session authentication. TASK-10
 confirmed the dedicated local database had no public tables, then applied only
-`2026_11_04_000000_create_users_table.php`. Migration history and `users` now exist;
-the unrelated cache migration remains pending because local cache/sessions use files.
+`2026_11_04_000000_create_users_table.php`. Migration history and `users` exist.
+The read-only TASK-13 status check shows the users and cache migrations applied;
+cache/sessions still use files. TASK-13 did not run development migrations.
 No development users were created by automated or browser verification; all such
 records stayed in generated restricted databases. See [authentication.md](authentication.md).
+
+TASK-13 adds the Product migration, exact-decimal model, owner relationships,
+native factories and ownership Policy. The migration remains pending in development;
+its PostgreSQL constraints and precision were verified only in generated isolated
+test databases. Existing data and migration history were preserved. See
+[products.md](products.md) for column types, units, constraints and reference decisions.
 
 ## Current automated testing (TASK-07)
 
