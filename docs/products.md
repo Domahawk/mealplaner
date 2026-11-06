@@ -1,7 +1,8 @@
 # Product data model
 
 TASK-13 introduces the Product model, migration, factories and ownership Policy.
-There are no product endpoints or frontend screens yet. The migration has been
+TASK-14 now adds the [Product REST API](product-api.md); frontend screens remain
+future work. The migration has been
 verified on isolated PostgreSQL databases; it has not been applied to development.
 
 ## Schema and units
@@ -34,8 +35,8 @@ Exact `numeric` columns avoid binary floating-point storage errors. Eloquent's
 serialization. Pass decimal strings when writing values; future calculation code
 must preserve decimal precision rather than implicitly converting to PHP floats.
 PostgreSQL rounds excess fractional digits to the declared scale (for example,
-`1.235` grams of protein becomes `1.24`). Future request validation must enforce
-accepted decimal precision before persistence; model casts are not input validation.
+`1.235` grams of protein becomes `1.24`). TASK-14 Form Requests reject excess
+fractional digits before persistence; model casts alone are not input validation.
 See [PostgreSQL numeric types](https://www.postgresql.org/docs/18/datatype-numeric.html).
 
 ## Ownership and future references
@@ -49,9 +50,9 @@ validated business fields.
 Laravel automatically discovers `ProductPolicy`. Authenticated users can create
 and list their own products; view/update/delete checks allow the owner and deny
 foreign private records as 404. Guest checks are denied. A Policy does not filter
-collections or automatically authorize Eloquent queries. The future CRUD layer must
-apply authentication, owner-scoped queries, explicit action authorization and CSRF
-protection as described in [authorization.md](authorization.md).
+collections or automatically authorize Eloquent queries. The TASK-14 CRUD layer
+applies authentication, owner-scoped queries/binding, explicit action authorization
+and CSRF protection as described in [authorization.md](authorization.md).
 
 The owner foreign key uses `ON DELETE RESTRICT` to prevent implicit product loss
 when deleting an account. A future account deletion workflow must handle owned data

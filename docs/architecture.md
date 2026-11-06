@@ -16,7 +16,8 @@ TASK-10 completes registration/login/logout within that starter. Mealplaner's
 **MVP v0.1.0** domain features are planned: user-owned nutritional products; recipes and
 quantity-based nutrition calculation; dated consumption records; and daily calorie,
 protein, carbohydrate, and fat totals. TASK-13 adds the Product persistence model
-and ownership Policy; the domain HTTP/UI workflows remain unimplemented.
+and ownership Policy; TASK-14 adds authenticated Product CRUD endpoints. Product UI
+and recipe/food-log workflows remain unimplemented.
 
 ## Detected technology and versions
 
@@ -112,8 +113,9 @@ flowchart LR
 ## Responsibilities and existing capabilities
 
 - **Laravel:** HTML entry delivery, web/API boundaries, JSON exception responses,
-  liveness/readiness and native account/session authentication. Future domain
-  validation, authorization, nutrition calculations and persistence belong here.
+  liveness/readiness, native account/session authentication and owner-scoped Product
+  CRUD with Form Requests, Policy checks and API Resources. Future recipe/log logic
+  and nutrition calculations extend these boundaries.
 - **Vue:** Mealplaner Home/about/not-found screens, route titles and keyboard focus,
   navigation, responsive presentation,
   loading/error/success connectivity states, theme preference, and PWA update notice.
@@ -127,8 +129,9 @@ flowchart LR
   connectivity polling or separate frontend API origin to configure.
 - **PostgreSQL:** intended persistent storage, with a configured `pgsql` connection
   and running development service. Eloquent persists user accounts; the `SELECT 1`
-  connectivity probe remains. No domain
-  models or product/recipe/consumption schema exist yet.
+  connectivity probe remains. The Product model/schema exists and is exercised in
+  isolated PostgreSQL tests; its development migration is still pending. Recipe and
+  consumption schemas remain future work.
 
 ## Routing
 
@@ -154,7 +157,11 @@ JSON API errors and separate static/framework handling. New server namespaces mu
 be excluded from both the Laravel SPA fallback and the Workbox navigation fallback.
 TASK-10 adds login/register views, a protected account view and frontend session
 checks. Laravel also protects the account entry and `/api/auth/user` with native
-`auth` middleware. Domain resource routes do not exist yet.
+`auth` middleware. TASK-14 registers the Product API in the same web/session group,
+with `auth`, owner-scoped route binding, Policy authorization and no-store responses.
+`/api/products` supports GET/POST and `/{product}` supports GET/PUT/PATCH/DELETE.
+The API prefix is already reserved from both SPA and PWA fallbacks. See
+[product-api.md](product-api.md) for validation and response contracts.
 
 ## Authentication and future authorization
 
@@ -213,8 +220,9 @@ TASK-13 adds the user-owned Product model, migration and native factory. Exact n
 columns store kcal/macronutrients per 100 g and optional package grams; PostgreSQL
 constraints enforce valid ranges and a required owner foreign key with restricted
 deletion. User/Product relationships and a real, automatically discovered Product
-Policy establish ownership boundaries for future CRUD. No product HTTP/UI feature
-exists, and the migration remains pending in development. The canonical isolated
+Policy establish ownership boundaries. TASK-14 adds Product CRUD using those
+relationships and Policy without changing the schema. No product UI exists, and the
+migration remains pending in development. The canonical isolated
 PostgreSQL suite verifies precision and constraints; optional SQLite tests provide
 model smoke coverage. See [products.md](products.md) for the schema and rationale.
 
@@ -363,7 +371,8 @@ Development Compose configuration is not the production deployment contract.
    visible starter copy with Mealplaner content; existing local PWA metadata overrides
    remain configurable. TASK-10 completes native session authentication. Resource
    ownership is documented by TASK-11, and TASK-13 adds the Product schema and Policy.
-   CI and local browser verification are recorded separately; remaining domain APIs,
+   TASK-14 implements Product CRUD; CI and local browser verification are recorded
+   separately. Remaining recipe/log APIs,
    recipe/log schema, nutrition calculations and production deployment are future work. `docs/NEW_PROJECT.md` is template-reuse reference, not
    an instruction to initialize another project inside Mealplaner.
 

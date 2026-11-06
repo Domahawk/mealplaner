@@ -1,6 +1,10 @@
 <?php
 
 use App\Http\Controllers\AuthenticationController;
+use App\Http\Controllers\ProductController;
+use App\Models\Product;
+use App\Models\User;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
 // These same-origin JSON endpoints deliberately use the web session/CSRF stack.
@@ -11,6 +15,19 @@ Route::prefix('api/auth')->controller(AuthenticationController::class)->group(fu
     Route::post('/login', 'login')->middleware('throttle:login');
     Route::post('/logout', 'logout')->middleware('auth');
 });
+
+// Resolve private IDs only within the authenticated owner's products, before validation.
+Route::bind('product', function (string $value): Product {
+    $user = Auth::user();
+    abort_unless($user instanceof User, 401);
+    $id = filter_var($value, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+    abort_if($id === false, 404);
+
+    return $user->products()->findOrFail($id);
+});
+
+Route::apiResource('api/products', ProductController::class)
+    ->middleware(['auth', 'cache.headers:no_store;private']);
 
 Route::view('/login', 'app')->name('login');
 Route::view('/register', 'app')->name('register');

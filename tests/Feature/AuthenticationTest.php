@@ -105,6 +105,27 @@ class AuthenticationTest extends TestCase
         $this->browserRequest('GET', '/api/auth/user')->assertOk()->assertJsonPath('user.id', $user->id);
     }
 
+    public function test_product_api_reuses_login_cookies_csrf_and_logout_invalidation(): void
+    {
+        $user = $this->createUser();
+        $this->browserRequest('GET', '/api/auth/session');
+        $this->browserRequest('POST', '/api/auth/login', $this->registration())->assertOk();
+        $created = $this->browserRequest('POST', '/api/products', [
+            'name' => 'Session product', 'calories_per_100g' => '100.25',
+            'protein_per_100g' => '1.00', 'carbohydrates_per_100g' => '20.00', 'fat_per_100g' => '1.00',
+        ])->assertCreated();
+        $id = $created->json('data.id');
+        $this->assertDatabaseHas('products', ['id' => $id, 'user_id' => $user->id]);
+        $this->browserRequest('GET', '/api/products/'.$id)->assertOk()->assertJsonPath('data.name', 'Session product');
+        $this->browserRequest('PATCH', '/api/products/'.$id, ['name' => 'Blocked change'], csrf: false)->assertStatus(419);
+        $this->browserRequest('PATCH', '/api/products/'.$id, ['name' => 'Updated session product'])
+            ->assertOk()->assertJsonPath('data.name', 'Updated session product');
+        $this->browserRequest('GET', '/api/products')->assertOk()->assertJsonPath('meta.total', 1);
+        $this->browserRequest('POST', '/api/auth/logout')->assertNoContent();
+        $this->browserRequest('GET', '/api/products/'.$id)->assertUnauthorized();
+        $this->assertDatabaseHas('products', ['id' => $id, 'name' => 'Updated session product']);
+    }
+
     public function test_logout_invalidates_the_session_and_rejects_replaying_its_old_cookie(): void
     {
         $this->createUser();
