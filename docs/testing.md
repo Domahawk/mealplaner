@@ -123,6 +123,24 @@ nonzero status; fix permissions/connectivity rather than falling back to develop
 The TASK-05 development-table cleanup was completed after explicit approval on
 2026-11-04. Automated tests never authorize changing development tables.
 
+## Product persistence coverage
+
+TASK-13 adds native Product/User factories without a Faker dependency. Use
+`Product::factory()->for($user)` when a fixture should reuse an owner. Only use
+factories in the guarded testing environment; they create actual database records.
+
+`tests/Feature/ProductTest.php` exercises persisted relationships, optional package
+information, decimal-string serialization, owner-scoped lookup, guarded ownership
+and automatic ProductPolicy discovery. `tests/Postgres/ProductTest.php` verifies
+raw exact numeric storage, rounding and boundaries, actual schema/index metadata,
+foreign keys, restricted owner deletion and rejection of invalid SQL inserts.
+Rejected writes use nested transactions/savepoints so the outer test transaction
+remains usable. No production model/table was added solely for testing.
+
+Canonical PostgreSQL tests establish numeric precision and CHECK constraint behavior.
+The optional SQLite path covers model behavior only and cannot prove PostgreSQL's
+numeric/check semantics. Product schema decisions are documented in [products.md](products.md).
+
 ## Coverage and reports
 
 The PHP development image includes pinned **Xdebug 3.5.3**, with `xdebug.mode=off`

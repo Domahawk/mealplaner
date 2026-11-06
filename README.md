@@ -34,7 +34,8 @@ records the earlier baseline.
 [Authorization conventions](docs/authorization.md) define server-side route protection,
 session-owned identity and the scoped queries/Policies required for future resources.
 Two-user tests verify existing account boundaries. Unknown `/account/...` paths
-return 404; products, recipes and food logs have no endpoints or policies yet.
+return 404. Product ownership relationships and a Policy now exist; products, recipes
+and food logs have no endpoints yet.
 
 [TASK-12 security verification](docs/security-verification.md) covers the current
 account flows, session invalidation/concurrency, CSRF, throttling and client-state
@@ -48,12 +49,16 @@ Planned MVP capabilities, **not yet implemented**:
 4. Record consumption by date.
 5. View daily calorie and macronutrient totals.
 
-The User model and users migration exist; domain models/migrations remain future work. PostgreSQL 18.6
+The User and Product models, migrations, native factories and Product Policy exist.
+The [product data model](docs/products.md) stores exact per-100-g nutrition and optional
+package information. Product CRUD and recipe/food-log schemas remain future work;
+the products migration has not been applied to development. PostgreSQL 18.6
 connectivity, existing migration compatibility, and committed-record persistence
 across reconnects are verified in an isolated test database. Development migration
 history now records the users migration, applied only after confirming the local
-database was empty. The unrelated cache migration remains pending; local cache and
-sessions use files. Docker lifecycle verification is recorded in [VERIFICATION.md](docs/VERIFICATION.md);
+database was empty. Read-only TASK-13 status inspection shows the existing users
+and cache migrations applied and the new products migration pending; TASK-13 ran
+no development migration. Local cache and sessions use files. Docker lifecycle verification is recorded in [VERIFICATION.md](docs/VERIFICATION.md);
 Mealplaner domain workflows remain future work. See [database.md](docs/database.md).
 
 ## Detected stack
@@ -83,10 +88,10 @@ installed packages. Use the existing container workflow.
 ## Repository structure
 
 ```text
-app/                       Laravel controllers, Form Requests, User model and provider
+app/                       Laravel controllers, Form Requests, User/Product models, Policy and provider
 bootstrap/                 Laravel startup and route registration
 config/                    Laravel configuration
-database/                  Cache/cache-lock and users migrations; empty seeder
+database/                  Cache/cache-lock, users and products migrations; factories; empty seeder
 resources/js/              Integrated Vue SPA: views, components, router, stores,
                            composables, and same-origin API helper
 resources/css/app.css      Responsive application and theme styling
@@ -273,6 +278,12 @@ unrelated application feature is introduced.
 
 ## Verification commands and current results
 
+TASK-13 passes **126 PostgreSQL tests / 2,100 assertions**, **88 SQLite tests /
+885 assertions**, **32 frontend tests**, both quality gates and production build
+checks. PHP coverage is **99.02% (101/102 statements)**. The product migration remains
+pending in development; all product persistence tests used isolated databases.
+See the [verification record](docs/VERIFICATION.md).
+
 TASK-12 passes **88 PostgreSQL tests / 1,481 assertions**, **83 SQLite tests**,
 **32 frontend tests**, both quality gates, coverage and production build checks.
 Isolated Chrome/HTTP probes verify account flows, shared-file throttling and delayed
@@ -366,6 +377,8 @@ setup, and its HMR test temporarily edits source. Do not remove database volumes
   component tests, coverage, JUnit artifacts, and unattended CI commands.
 - [Verification record](docs/VERIFICATION.md): current stabilization results and the
   historical architecture-audit baseline.
+- [Product data model](docs/products.md): per-100-g units, exact decimals, constraints,
+  ownership, factories and future reference boundaries.
 - [Database guide](docs/database.md): PostgreSQL requirements, safe migration workflow,
   restricted integration testing, and persistence verification bounds.
 - [Development guide](docs/DEVELOPMENT.md): Docker-only fresh setup, pinned runtimes,

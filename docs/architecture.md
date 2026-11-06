@@ -15,7 +15,8 @@ route titles/focus, and verifies the existing development browser/HMR workflow.
 TASK-10 completes registration/login/logout within that starter. Mealplaner's
 **MVP v0.1.0** domain features are planned: user-owned nutritional products; recipes and
 quantity-based nutrition calculation; dated consumption records; and daily calorie,
-protein, carbohydrate, and fat totals. None of those features is implemented yet.
+protein, carbohydrate, and fat totals. TASK-13 adds the Product persistence model
+and ownership Policy; the domain HTTP/UI workflows remain unimplemented.
 
 ## Detected technology and versions
 
@@ -56,10 +57,12 @@ Reserved names in routing expressions are exclusions, not evidence of installed 
 ```text
 mealplaner/
 ├── app/Http/Controllers/        # Laravel HTTP code, including ReadinessController
+├── app/Models/                 # User and Product models with owner relationships
+├── app/Policies/               # Product ownership Policy
 ├── app/Providers/              # Application service provider
 ├── bootstrap/                  # Laravel bootstrapping and route registration
 ├── config/                     # Laravel environment-based configuration
-├── database/                   # Cache/cache-lock and users migrations; empty seeder
+├── database/                   # Cache/users/products migrations; factories; empty seeder
 ├── resources/
 │   ├── js/                     # Vue SPA, router, stores, composables, lib, views
 │   ├── css/app.css             # Responsive light/dark application styling
@@ -188,8 +191,8 @@ records regression coverage, a multi-worker overlap probe and remaining limits.
 ## Persistence and environment
 
 `config/database.php` defaults to PostgreSQL, with an explicitly separate in-memory
-SQLite connection for default tests. Framework cache/cache-lock and users migrations
-and an empty seeder are present; TASK-04 preserved the initial files unchanged. Existing
+SQLite connection for optional tests. Framework cache/cache-lock, users and products
+migrations, Product/User factories and an empty seeder are present; TASK-04 preserved the initial files unchanged. Existing
 PostgreSQL 18.6 connectivity and `pdo_pgsql` were verified. At TASK-04, development had no user relations or migration repository and was
 deliberately left untouched because it was not confirmed newly created/dedicated. The migration passed in a fresh restricted
 PostgreSQL test database, including commit/reconnect persistence. TASK-04 used no reset or PostgreSQL restart. TASK-05 additionally checks ordinary
@@ -199,10 +202,21 @@ That initial probe created two empty development cache tables. Explicitly approv
 cleanup on 2026-11-04 removed only those tables after locked empty checks, restoring
 zero user relations. TASK-10 subsequently confirmed the dedicated local database
 was empty and applied only the new users migration, creating migration history and
-the users table. The cache migration remains pending; local cache/sessions use files.
+the users table. The cache migration was pending at that stage. Read-only TASK-13
+status inspection now shows the users and cache migrations applied, with products
+pending; TASK-13 ran no development migration. Local cache/sessions use files.
 Existing records were not changed, and account verification used isolated test databases.
 `/api/health` remains operational without a database; `/api/ready` checks connectivity.
 See [database.md](database.md) for the full workflow and bounded verification results.
+
+TASK-13 adds the user-owned Product model, migration and native factory. Exact numeric
+columns store kcal/macronutrients per 100 g and optional package grams; PostgreSQL
+constraints enforce valid ranges and a required owner foreign key with restricted
+deletion. User/Product relationships and a real, automatically discovered Product
+Policy establish ownership boundaries for future CRUD. No product HTTP/UI feature
+exists, and the migration remains pending in development. The canonical isolated
+PostgreSQL suite verifies precision and constraints; optional SQLite tests provide
+model smoke coverage. See [products.md](products.md) for the schema and rationale.
 
 Root `.env.example` currently documents local PostgreSQL, file sessions/cache,
 synchronous queues, log mail, application naming, and Vite/Compose settings. Real local
@@ -348,8 +362,9 @@ Development Compose configuration is not the production deployment contract.
 6. **Plan missing domain/auth work without scaffolding again.** TASK-03 replaces
    visible starter copy with Mealplaner content; existing local PWA metadata overrides
    remain configurable. TASK-10 completes native session authentication. Resource
-   ownership, domain schema, nutrition rules, CI, browser/PWA acceptance, and deployment
-   remain scoped future work. `docs/NEW_PROJECT.md` is template-reuse reference, not
+   ownership is documented by TASK-11, and TASK-13 adds the Product schema and Policy.
+   CI and local browser verification are recorded separately; remaining domain APIs,
+   recipe/log schema, nutrition calculations and production deployment are future work. `docs/NEW_PROJECT.md` is template-reuse reference, not
    an instruction to initialize another project inside Mealplaner.
 
 7. **Review locked development-tool advisories in scoped maintenance.** TASK-03

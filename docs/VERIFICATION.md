@@ -1,5 +1,85 @@
 # Verification record
 
+## TASK-13 — product database foundation (2026-11-04)
+
+Started from a clean local `main` at `edaa703` and created
+`feature/task-13-product-model` before editing. The root Laravel/Vue architecture,
+existing authentication and routes are preserved.
+
+### Schema and changes
+
+Added `Product`, its migration and factory, User's products relationship and a native
+User factory. Numeric columns store nutrition per 100 g: kcal `numeric(8,2)`, each
+macronutrient `numeric(5,2)`; nullable package grams use `numeric(10,3)`. The schema
+requires an owner, nonblank name and supplied brand, nonnegative calories, macros
+between 0 and 100 and positive supplied package weight. It rejects non-finite values.
+Owner deletion is restricted; a non-unique `(user_id, name)` index supports scoped
+queries. Decimal casts preserve fixed-scale strings. [Product decisions](products.md)
+explain rounding, limits, optional fields and future recipe/log references.
+
+`ProductPolicy` follows AGENTS.md's real-model policy requirement. Automatic discovery,
+guest denial and owner/foreign action checks are covered. The Policy and guarded
+owner assignment do not replace query scoping or HTTP authorization in future CRUD.
+No product endpoint, UI, recipe/log table, dependency or architectural layer was added.
+
+Changed files: `app/Models/Product.php`, `app/Models/User.php`,
+`app/Policies/ProductPolicy.php`, `database/factories/{Product,User}Factory.php`,
+`database/migrations/2026_11_04_000001_create_products_table.php`, `composer.json`,
+`tests/{Feature,Postgres}/ProductTest.php`, `README.md`, `docs/products.md`,
+`docs/architecture.md`, `docs/authorization.md`, `docs/database.md`, `docs/testing.md`
+and this record. Composer's only change registers native factory autoloading;
+both dependency lockfiles are unchanged.
+
+### Executed verification
+
+Commands used existing Docker services with the documented users:
+`docker compose exec -T --user app backend` for PHP and
+`docker compose exec -T --user node frontend` for npm.
+
+| Check                                                  | Result                                                                                                                                                              |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `composer dump-autoload --no-interaction --no-scripts` | Passed; registered factory classes without installing packages.                                                                                                     |
+| `composer validate --strict`                           | Passed; unchanged dependency lockfile remains valid.                                                                                                                |
+| `composer quality`                                     | Passed: Pint 52 files and PHPStan/Larastan level 8, no errors.                                                                                                      |
+| `composer test`                                        | Initial run caught a new test's SQLSTATE mismatch; corrected and verified by the final full coverage run.                                                           |
+| `composer test:coverage`                               | Passed: 126 tests, 2,100 assertions; 99.02% app/routes statement coverage (101/102), Clover/HTML generated. Test database and restricted role removed successfully. |
+| `composer test:sqlite`                                 | Passed: 88 tests, 885 assertions; in-memory model smoke coverage only.                                                                                              |
+| `npm run quality`                                      | Passed: ESLint with zero warnings, Prettier and strict Vue TSC.                                                                                                     |
+| `npm run test:unit`                                    | Passed: 32 existing frontend tests.                                                                                                                                 |
+| `npm run build` / `npm run verify:build`               | Passed: integrated Vite/PWA production assets and artifact checks.                                                                                                  |
+| `php artisan migrate:status`                           | Read-only check passed: users and cache migrations applied, products pending. No development migration ran in TASK-13.                                              |
+
+New tests verify native factory ownership, both relationship directions, nullable
+package information, serialized decimal strings, duplicate-name allowance, scoped
+cross-user lookup, mass-assignment protection and Policy discovery/denials. PostgreSQL
+tests additionally inspect actual numeric precision/scale and index metadata, exact
+stored decimals and arithmetic, rounding, bounds, direct-write rejection, foreign
+keys and owner deletion restrictions. Writes use the existing guarded generated test
+database and transaction/savepoint isolation; no development data is used.
+
+The first PostgreSQL run correctly blocked owner deletion, but that new test expected
+foreign-key SQLSTATE `23503`. PostgreSQL reports the more specific `23001`
+(`restrict_violation`) for `ON DELETE RESTRICT`; the expectation was corrected without
+changing the constraint or accepting generic errors. Final suites pass.
+
+Read-only HTTP requests through existing Nginx returned 200 for `/`, `/up`,
+`/api/health` and `/api/ready`; health retained exact JSON `{"status":"ok"}`.
+Guest `/account` redirected to `/login` (302), and `/api/auth/user` returned JSON 401.
+The initial sandbox HTTP attempt was denied socket access; the same checks succeeded
+with approved local network access. No browser/HMR check was repeated: frontend code
+and integration were unchanged.
+
+### Remaining scope and safety
+
+The new migration intentionally remains pending in development. Apply it later only
+after reviewing and confirming the target through the normal migration workflow.
+SQLite cannot establish PostgreSQL numeric/CHECK behavior. Product CRUD, validation,
+recipe/log references and historical nutrition/deletion workflows belong to later tasks.
+No existing development records, migration files/history, databases, volumes or local
+environment files were altered or reset. No production deployment, commit, push,
+merge or pull request was performed. Hosted CI was not executed for these uncommitted
+changes. Active branch: `feature/task-13-product-model`.
+
 ## TASK-12 — authentication security verification (2026-11-04)
 
 Started with a clean tree on local `main` at `3950439`. Created and switched to

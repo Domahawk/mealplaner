@@ -1,9 +1,12 @@
 # Authorization and ownership
 
-TASK-11 audits and verifies access control in the existing single Laravel/Vue
+TASK-11 audited and verified access control in the existing single Laravel/Vue
 application. Authentication remains Laravel's native `web` session guard; Vue
 navigation checks supplement server enforcement. No new auth system, domain model,
-migration, placeholder policy, global ownership scope or repository layer is added.
+migration, placeholder policy, global ownership scope or repository layer was added
+in that task. TASK-13 now adds the real Product model, owner relationship and
+auto-discovered ProductPolicy; see [products.md](products.md). No product endpoints
+exist yet, so query scoping and HTTP action authorization remain requirements for CRUD.
 
 ## Current access-control audit
 
@@ -32,7 +35,7 @@ account paths now return 404 instead of the SPA entry. The registered `/account`
 route retains its native authentication middleware. The previous shell contained no
 private records, so this is boundary hardening, not evidence of a prior data leak.
 
-The User is the only application model. Current account operations use the session
+At the TASK-11 audit, User was the only application model. Current account operations use the session
 user directly; they do not fetch a target User from a supplied ID. Tests use two
 accounts and independent cookies to verify that forged query/body/header identifiers
 cannot select another identity, overwrite another registration, or log out another
@@ -40,8 +43,9 @@ session. No redundant UserPolicy is needed for a resource lookup that does not e
 
 ## Required conventions for future features
 
-Products, recipes and food logs do not exist yet. The following patterns are
-requirements for their implementation, not working domain APIs.
+The Product model, owner relationship and Policy exist as of TASK-13. Recipes and
+food logs remain future work. These patterns apply to the upcoming domain APIs;
+model relationships and Policies alone do not secure an HTTP endpoint.
 
 1. **Authenticate at the server boundary.** Apply native `auth` to every private
    route, including listings, exports, aggregates and mutation endpoints. Preserve
@@ -58,9 +62,9 @@ requirements for their implementation, not working domain APIs.
    `viewAny` permission does not filter a collection. Group `orWhere` conditions so
    they cannot escape the owner predicate. Apply the same rules in queued jobs and
    services, passing explicit owner context rather than depending on HTTP globals.
-4. **Authorize actions with the real model's Policy.** Add `app/Policies/ProductPolicy.php`
-   alongside the actual Product feature, using Laravel's standard model/policy
-   discovery. Do the same for Recipe and FoodLog when introduced. Use non-nullable
+4. **Authorize actions with the real model's Policy.** Use the existing `app/Policies/ProductPolicy.php`
+   and Laravel's standard model/policy discovery. Add equivalent Policies for Recipe
+   and FoodLog when introduced. Use non-nullable
    `User` parameters for private abilities, and cover the applicable `viewAny`,
    `view`, `create`, `update`, and `delete` actions. Invoke `Gate::authorize`, native
    `can` middleware or a Form Request authorization check; defining a policy alone
@@ -84,10 +88,10 @@ use Illuminate\Support\Facades\Gate;
 // Relationship scoping hides another owner's record before authorization/serialization.
 $product = $request->user()->products()->findOrFail($id);
 Gate::authorize('update', $product);
-$product->update($request->safe()->only(['name', 'calories', 'protein', 'carbohydrates', 'fat']));
+$product->update($request->safe()->only(['name', 'calories_per_100g', 'protein_per_100g', 'carbohydrates_per_100g', 'fat_per_100g']));
 ```
 
-For that future ProductPolicy, an ownership check can use Laravel's native denial
+The ProductPolicy ownership check uses Laravel's native denial
 response. Match the ownership key's cast/type to the User primary key:
 
 ```php
