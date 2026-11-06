@@ -141,6 +141,13 @@ Canonical PostgreSQL tests establish numeric precision and CHECK constraint beha
 The optional SQLite path covers model behavior only and cannot prove PostgreSQL's
 numeric/check semantics. Product schema decisions are documented in [products.md](products.md).
 
+TASK-14 adds `ProductApiTest` for real HTTP CRUD/resource responses, pagination,
+owner-scoped lookup/counts, guest and cross-user rejection, Policy invocation,
+precision/type/range validation and enforced CSRF. `AuthenticationTest` reuses its
+file-session browser helper to exercise Product CRUD through actual login cookies,
+fresh guards, encrypted XSRF headers and logout invalidation. Production auth/CSRF
+middleware is retained; no test-only production route or new framework is introduced.
+
 ## Coverage and reports
 
 The PHP development image includes pinned **Xdebug 3.5.3**, with `xdebug.mode=off`

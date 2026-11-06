@@ -1,5 +1,97 @@
 # Verification record
 
+## TASK-14 — Product CRUD API and authorization (2026-11-06)
+
+Created `feature/task-14-product-api` from clean local `main` at `1f16cc8` before
+editing. Reused the Product schema/model/factories/Policy and native web session
+authentication; no schema, dependencies, frontend or infrastructure changed.
+
+### Implementation and files
+
+`ProductController`, `ProductRequest`, `ListProductsRequest` and `ProductResource`
+implement the `/api/products` resource routes registered in `routes/web.php`.
+GET listing/show and PUT/PATCH updates return 200, POST returns 201 and DELETE
+returns empty 204. Lists are ordered by ascending ID, default to 20 per page and
+validate page size up to 100. Individual and collection responses use Laravel
+Resource data wrapping with explicit product fields and exact decimal strings;
+collections include native links/meta. Successful responses are private/no-store.
+See [product-api.md](product-api.md) for the complete input/output contract.
+
+All routes retain web cookies, session locking and CSRF, require native `auth` and
+invoke ProductPolicy through Gate. Scoped binding looks up item IDs only through
+the authenticated user's products, before payload validation. Listing/counts and
+creation also use that relationship. Missing/foreign/invalid IDs return JSON 404;
+guest requests return JSON 401 subject to native CSRF rejection (419) on unsafe
+requests. Client owner/ID/timestamp input is rejected, including null values.
+Validation enforces text bounds, nullable optional fields, numeric ranges and decimal
+precision; no silently rounded excess precision or user-selected ownership is accepted.
+
+Created:
+
+- `app/Http/Controllers/ProductController.php`
+- `app/Http/Requests/{ProductRequest,ListProductsRequest}.php`
+- `app/Http/Resources/ProductResource.php`
+- `tests/Feature/ProductApiTest.php`
+- `docs/product-api.md`
+
+Modified: `routes/web.php`, `tests/Feature/AuthenticationTest.php`, `README.md`,
+`docs/{architecture,authorization,products,testing,VERIFICATION}.md`.
+
+### Executed verification
+
+Commands ran through existing Docker services, using `--user app backend` for PHP
+and `--user node frontend` for npm. No dependency install or service restart was needed.
+
+| Command/check                                    | Result                                                                                                                                                                                      |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `composer quality`                               | Passed: Pint 57 files and PHPStan/Larastan level 8, no errors.                                                                                                                              |
+| `composer test`                                  | Passed: initial complete Product API suite, 220 tests / 4,163 assertions.                                                                                                                   |
+| `composer test:coverage`                         | Expanded suite passed: 223 tests / 4,244 assertions, no skips; 99.40% app/routes line coverage (165/166), HTML/Clover generated. Temporary PostgreSQL database and restricted role removed. |
+| `composer test:sqlite`                           | Passed: 185 tests / 2,253 assertions, memory-only smoke coverage.                                                                                                                           |
+| `npm run quality`                                | Passed: zero-warning ESLint, Prettier and strict Vue TSC.                                                                                                                                   |
+| `npm run test:unit`                              | Passed: all 32 existing frontend tests.                                                                                                                                                     |
+| `npm run build` / `npm run verify:build`         | Passed: 50 modules, integrated Vite/PWA production assets and artifact checks.                                                                                                              |
+| `php artisan route:list --path=api/products -vv` | Five resource entries, including shared PUT/PATCH; web, auth and private/no-store middleware retained.                                                                                      |
+| `php artisan migrate:status`                     | Read-only: existing users/cache migrations applied, existing products migration pending. No development migration ran.                                                                      |
+
+Tests cover a complete owner CRUD lifecycle, exact response fields/decimals, optional
+information, valid bounds, trimmed/ignored input, stable pagination and owner-only
+counts, guests on every operation, explicit authorization denials, foreign/missing
+IDs with valid and invalid payloads, malformed IDs, JSON errors for HTML requests,
+read-only fields, required versus partial updates, and invalid numeric types/ranges/
+precision. Every mutation additionally exercises CSRF rejection and acceptance.
+The existing file-session authentication harness now verifies Product access through
+real login cookies, fresh guards/session stores, encrypted XSRF headers and logout
+invalidation without `actingAs`.
+
+Initial static analysis required explicit nullable-user guards in controller queries;
+these were added without suppressions. Initial tests also found that native cache
+middleware applies only to cacheable methods: Resource response hooks and DELETE
+now explicitly set no-store. A new unchanged-record assertion compared factory and
+reloaded attribute-array insertion order; taking its baseline from persisted state
+preserves strict value/type comparisons. Final review also reproduced acceptance
+of embedded null bytes in product names/brands with two failing PostgreSQL cases.
+Native `not_regex` validation now rejects these before persistence; both POST and
+PATCH regressions pass on PostgreSQL and SQLite. Final suites pass without relaxed
+rules.
+
+Read-only HTTP requests through existing Nginx at `127.0.0.1:8000` returned 200 for
+`/`, `/up`, `/api/health` and `/api/ready`. Health retained exact JSON
+`{"status":"ok"}`. Guest `/api/products` and `/api/products/1` returned JSON 401.
+Authenticated HTTP behavior was verified by Laravel feature/integration requests
+in the generated database, not by writing to the live development database.
+
+### Limits and safety
+
+Apply the existing products migration only through the reviewed migration workflow
+before using authenticated CRUD against the local development database. No development
+migration, record write, schema change, reset, environment edit, key rotation or
+volume operation occurred. SQLite remains optional; PostgreSQL is authoritative for
+the existing numeric/CHECK constraints. Search, filtering, frontend integration and
+recipe/food-log features remain future work. Browser/HMR and hosted GitHub Actions
+were not rerun for these backend-only, uncommitted changes. No commit, push, merge
+or PR creation occurred; all work remains on `feature/task-14-product-api`.
+
 ## TASK-13 — product database foundation (2026-11-04)
 
 Started from a clean local `main` at `edaa703` and created

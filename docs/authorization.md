@@ -5,10 +5,17 @@ application. Authentication remains Laravel's native `web` session guard; Vue
 navigation checks supplement server enforcement. No new auth system, domain model,
 migration, placeholder policy, global ownership scope or repository layer was added
 in that task. TASK-13 now adds the real Product model, owner relationship and
-auto-discovered ProductPolicy; see [products.md](products.md). No product endpoints
-exist yet, so query scoping and HTTP action authorization remain requirements for CRUD.
+auto-discovered ProductPolicy; see [products.md](products.md). TASK-14 now applies
+these conventions to [Product CRUD](product-api.md), using owner-scoped ID binding,
+relationship queries, Form Requests and explicit Gate checks on every operation.
 
 ## Current access-control audit
+
+The authenticated `/api/products` resource routes now inherit web/session/CSRF
+middleware. Listing and creation use the session owner relationship; binding rejects
+foreign/missing IDs before validation with 404. ProductPolicy checks authorize every
+action, and explicit resource serialization excludes account/owner data. Guest
+requests return JSON 401, subject to normal CSRF rejection (419) on unsafe requests.
 
 | Surface                              | Server boundary                                                                                                                              | Browser behavior                                                                                         |
 | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
@@ -44,7 +51,7 @@ session. No redundant UserPolicy is needed for a resource lookup that does not e
 ## Required conventions for future features
 
 The Product model, owner relationship and Policy exist as of TASK-13. Recipes and
-food logs remain future work. These patterns apply to the upcoming domain APIs;
+food logs remain future work. Product CRUD applies these patterns as of TASK-14;
 model relationships and Policies alone do not secure an HTTP endpoint.
 
 1. **Authenticate at the server boundary.** Apply native `auth` to every private
@@ -123,7 +130,8 @@ it. Do not introduce implicit global scopes or a generic ownership framework now
 | Invalid fields or an invalid referenced resource            | Laravel 422 validation response without exposing another user's record.  |
 | Invalid request-forgery credentials on a mutation           | Native 419 may precede authentication; do not disable CSRF to force 401. |
 
-The current app has no domain action that needs a policy-driven 403. Signed storage
+The current ProductPolicy allows visible owner actions; API tests also verify native
+403 handling when an action is denied. Signed storage
 denial already has its own native 403/404 contract. Future resource tasks must add
 tests for their actual policy denials instead of relying on these account tests.
 

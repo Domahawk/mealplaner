@@ -34,8 +34,8 @@ records the earlier baseline.
 [Authorization conventions](docs/authorization.md) define server-side route protection,
 session-owned identity and the scoped queries/Policies required for future resources.
 Two-user tests verify existing account boundaries. Unknown `/account/...` paths
-return 404. Product ownership relationships and a Policy now exist; products, recipes
-and food logs have no endpoints yet.
+return 404. The authenticated [Product REST API](docs/product-api.md) supports owned
+product CRUD, validation and pagination. Recipes and food logs have no endpoints yet.
 
 [TASK-12 security verification](docs/security-verification.md) covers the current
 account flows, session invalidation/concurrency, CSRF, throttling and client-state
@@ -43,7 +43,7 @@ handling. It records resolved defects and the limits of local MVP verification.
 
 Planned MVP capabilities, **not yet implemented**:
 
-1. Create, view, edit, and delete user-owned products with nutritional information.
+1. Product management screens using the implemented CRUD API.
 2. Create recipes from existing products and specified quantities.
 3. Calculate recipe calories, protein, carbohydrates, and fat automatically.
 4. Record consumption by date.
@@ -51,7 +51,8 @@ Planned MVP capabilities, **not yet implemented**:
 
 The User and Product models, migrations, native factories and Product Policy exist.
 The [product data model](docs/products.md) stores exact per-100-g nutrition and optional
-package information. Product CRUD and recipe/food-log schemas remain future work;
+package information. Product CRUD endpoints now exist; frontend integration and
+recipe/food-log schemas remain future work;
 the products migration has not been applied to development. PostgreSQL 18.6
 connectivity, existing migration compatibility, and committed-record persistence
 across reconnects are verified in an isolated test database. Development migration
@@ -278,6 +279,13 @@ unrelated application feature is introduced.
 
 ## Verification commands and current results
 
+TASK-14 passes **223 PostgreSQL tests / 4,244 assertions**, **185 optional SQLite
+tests / 2,253 assertions**, **32 frontend tests**, both quality gates and production
+build/artifact checks. PHP app/routes coverage is **99.40% (165/166 statements)**.
+Authenticated CRUD, owner boundaries, precise validation, pagination and real
+login-cookie/CSRF/logout integration are verified in isolated testing databases.
+The development products migration remains pending; see [Product API setup](docs/product-api.md).
+
 TASK-13 passes **126 PostgreSQL tests / 2,100 assertions**, **88 SQLite tests /
 885 assertions**, **32 frontend tests**, both quality gates and production build
 checks. PHP coverage is **99.02% (101/102 statements)**. The product migration remains
@@ -377,6 +385,8 @@ setup, and its HMR test temporarily edits source. Do not remove database volumes
   component tests, coverage, JUnit artifacts, and unattended CI commands.
 - [Verification record](docs/VERIFICATION.md): current stabilization results and the
   historical architecture-audit baseline.
+- [Product API](docs/product-api.md): session-authenticated CRUD endpoints, JSON shapes,
+  precision validation, pagination and ownership enforcement.
 - [Product data model](docs/products.md): per-100-g units, exact decimals, constraints,
   ownership, factories and future reference boundaries.
 - [Database guide](docs/database.md): PostgreSQL requirements, safe migration workflow,
