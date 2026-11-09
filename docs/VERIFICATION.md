@@ -1,5 +1,118 @@
 # Verification record
 
+## TASK-16 — Product search and filtering (2026-11-09)
+
+Created `feature/task-16-product-search` from clean local `main` at `203e8f8` before
+editing. Extended the existing Product API/UI without dependencies, schema/index
+changes, authentication replacement or additional endpoints.
+
+### Implementation and changed files
+
+`GET /api/products` now accepts optional `search` and `calories_min/max`,
+`protein_min/max`, `carbohydrates_min/max`, `fat_min/max` query pairs. Name/brand
+matching is a literal, case-insensitive substring search using SQL LOWER on both
+operands and a bound LIKE pattern with explicit escaping. The name/brand OR is
+grouped inside the user relationship. Nutrition ranges are inclusive, independently
+optional, respect existing per-100-g capacities/two-decimal precision and reject
+reversed min/max values with field-keyed JSON 422 errors. Zero and empty bounds are
+handled explicitly. All filters combine before owner-only totals/pagination;
+ascending-ID ordering and valid query criteria in links are preserved. No speculative
+search infrastructure or new index was introduced. [API details](product-api.md).
+
+The existing Products page adds a search field and a collapsible, labeled nutrition
+panel. Input is debounced for 300 ms; criteria changes reset page 1, while pagination
+retains criteria. URL query state restores on refresh, bookmarks and Back/Forward.
+The page clears stale cards immediately while criteria change and ignores obsolete
+results/errors. An explicit guard also prevents older, delayed URL navigations from
+replacing newer typing. Client input spaces survive pauses between words. Field
+errors, no-match state, loading/retry behavior and active-filter CRUD are covered.
+No product data is stored in the URL or browser storage. [UI details](product-ui.md).
+
+Created:
+
+- `resources/js/components/ProductFilters.vue`
+- `resources/js/composables/useProductSearch.ts`
+- `tests/Feature/ProductSearchTest.php`
+
+Modified: `app/Http/Controllers/ProductController.php`,
+`app/Http/Requests/ListProductsRequest.php`, `resources/js/lib/products.ts`,
+`resources/js/views/ProductsView.vue`, `resources/css/app.css`,
+`tests/frontend/products.test.ts`, `README.md`,
+`docs/{architecture,database,product-api,product-ui,products,testing,VERIFICATION}.md`.
+
+### Executed checks
+
+PHP commands used `docker compose exec -T --user app backend`; npm commands used
+`docker compose exec -T --user node frontend`. Existing containers and installed
+locked tooling were reused. Tests retained all isolation/bootstrap/role checks.
+
+| Check                                         | Result                                                                                                                                |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `composer quality`                            | Passed: Pint 58 files; PHPStan/Larastan level 8, no errors.                                                                           |
+| `composer test`                               | Passed: 303 tests, 5,773 assertions; generated PostgreSQL database/login cleaned up.                                                  |
+| `composer test:coverage`                      | Passed: same full 303-test suite; app/routes line coverage 99.47% (187/188), HTML/Clover generated; temporary database/login removed. |
+| `composer test:sqlite`                        | Passed: 265 tests, 3,142 assertions, memory-only environment.                                                                         |
+| `npm run quality`                             | Passed: zero-warning ESLint, Prettier and strict Vue TSC.                                                                             |
+| `npm run test:unit` / `npm run test:coverage` | Passed: final 62 tests across four files; frontend line coverage 94.64% (495/523). HTML/LCOV/summary generated.                       |
+| `npm run build` / `npm run verify:build`      | Passed: 60 modules, integrated Vite/PWA assets and artifact checks.                                                                   |
+| `php artisan migrate:status`                  | Read-only: users/cache/products migrations already applied in development. No TASK-16 migration ran.                                  |
+
+Backend additions cover case-insensitive name/brand matches, foreign-owner matching
+records, null brands, no matches, whitespace search, literal percent/underscore/
+escape/backslash/SQL-fragment input, each nutrient's open/closed/equal/zero bounds,
+combined filters, ordering, pagination/link state and invalid field types/ranges/
+precision. All records use the existing generated restricted database and transaction
+isolation. Frontend tests cover applied URL hydration, debounce request counts,
+reset/clear, combined ranges and page state, history restoration, field errors,
+zero bounds, CRUD preservation, stale results, navigation-away cancellation and
+race/typing regressions with real application/router/Pinia instances.
+
+Two new regressions were first observed failing, then corrected without suppressions:
+a slow session guard allowed an older search navigation to overwrite newer typing;
+URL normalization also removed the space when a user paused between words. Pending
+URL writes now preserve the latest draft, and bookmarks retain input spacing while
+API requests normalize surrounding whitespace. All final checks pass.
+
+### Actual Chrome/HTTP verification
+
+Chrome/Playwright used the earlier installed tooling and a temporary Laravel server
+serving the final production bundle. The existing guarded provisioning mechanism
+created a fresh restricted PostgreSQL database/login; the child verified testing
+mode, actual database/role and restricted permissions before ordinary migrations.
+Browser sessions used private temporary file storage and a synthetic application
+key. No development record or local environment was changed. The server and its
+private files stopped/cleaned up, and only the generated database/login were removed
+following each browser run.
+
+The final real-browser pass verified:
+
+- Two registered test accounts, with a foreign matching product excluded from results.
+- Case-insensitive name and brand matching, literal API phrase handling, one listing
+  request after rapid search input, and preservation of a pause between words.
+- All eight nutrition bounds together, including zero and exact inclusive boundaries.
+- Filtered pagination, direct reload/bookmarked controls and browser Back/Forward.
+- Invalid reversed range errors beside their field, followed by successful correction.
+- Empty matches and clear/reset behavior; editing, deleting and creating products with
+  criteria retained, including the notice for a created product hidden by filters.
+- Light/dark layouts at 1440, 390 and 320 px without horizontal overflow; four
+  temporary screenshots captured and inspected, with no browser runtime exceptions.
+
+Read-only normal-origin HTTP checks returned exact health JSON `{"status":"ok"}`
+and readiness JSON 200; a guest filtered listing returned JSON 401. The existing
+products migration is now applied in development, unlike the earlier TASK-15 status;
+this was discovered by inspection, not applied by TASK-16.
+
+### Limits and safety
+
+Case matching follows the database locale; accent folding, fuzzy search, autocomplete,
+external food databases and advanced search indexes are out of scope. Substring
+matching can scan the authenticated owner's products; optimize only after profiling.
+SQLite exercises ASCII query behavior, with PostgreSQL authoritative for persistence.
+HMR, production offline browser checks and hosted CI were not repeated for this task;
+production asset verification passed. No development data/schema, migration, secret,
+key, service/volume or dependency was changed. No commit, push, merge or PR creation
+occurred. Active branch: `feature/task-16-product-search`.
+
 ## TASK-15 — Product management UI (2026-11-06)
 
 Created `feature/task-15-product-ui` from clean local `main` at `53c4893` before

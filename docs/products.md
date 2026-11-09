@@ -3,7 +3,8 @@
 TASK-13 introduces the Product model, migration, factories and ownership Policy.
 TASK-14 adds the [Product REST API](product-api.md), and TASK-15 adds the
 [management interface](product-ui.md). The migration has been
-verified on isolated PostgreSQL databases; it has not been applied to development.
+verified on isolated PostgreSQL databases; read-only TASK-16 inspection now records
+it as applied in development.
 
 ## Schema and units
 
@@ -82,7 +83,8 @@ SQLite retains optional migration/model smoke coverage. Its numeric affinity and
 missing PostgreSQL-specific CHECK constraints cannot establish PostgreSQL precision
 or constraint correctness; the canonical PostgreSQL suite is authoritative.
 
-The new migration remains pending in development. Apply it only through the normal
-reviewed [migration workflow](database.md), after confirming the intended target.
+At TASK-13 the new migration remained pending in development. Read-only TASK-16
+inspection now confirms it is applied; no migration was run in TASK-16. Continue
+to use the reviewed [migration workflow](database.md), after confirming the target.
 TASK-13 did not run development migrations, change existing records, reset a database,
 or introduce recipe/food-log tables.

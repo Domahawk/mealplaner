@@ -114,15 +114,31 @@ beforeEach(() => {
             const parsed: unknown = options?.body ? JSON.parse(String(options.body)) : null;
             const body = isRecord(parsed) ? parsed : {};
             if (method === 'GET') {
-                const page = Number(
-                    new URL(path, 'http://localhost').searchParams.get('page') ?? 1,
+                const params = new URL(path, 'http://localhost').searchParams;
+                const page = Number(params.get('page') ?? 1);
+                const term = params.get('search')?.toLowerCase() ?? '';
+                let matches = products.filter(
+                    (item) =>
+                        item.name.toLowerCase().includes(term) ||
+                        item.brand?.toLowerCase().includes(term),
                 );
+                for (const nutrient of ['calories', 'protein', 'carbohydrates', 'fat'] as const) {
+                    const minimum = params.get(`${nutrient}_min`);
+                    const maximum = params.get(`${nutrient}_max`);
+                    matches = matches.filter(
+                        (item) =>
+                            (minimum === null ||
+                                Number(item[`${nutrient}_per_100g`]) >= Number(minimum)) &&
+                            (maximum === null ||
+                                Number(item[`${nutrient}_per_100g`]) <= Number(maximum)),
+                    );
+                }
                 return json({
-                    data: products.slice((page - 1) * 2, page * 2),
+                    data: matches.slice((page - 1) * 2, page * 2),
                     meta: {
                         current_page: page,
-                        last_page: Math.max(1, Math.ceil(products.length / 2)),
-                        total: products.length,
+                        last_page: Math.max(1, Math.ceil(matches.length / 2)),
+                        total: matches.length,
                     },
                 });
             }
@@ -147,6 +163,8 @@ beforeEach(() => {
 
 afterEach(() => {
     wrapper?.unmount();
+    wrapper = undefined;
+    vi.useRealTimers();
     document.cookie = 'XSRF-TOKEN=; Max-Age=0; path=/';
     vi.unstubAllGlobals();
 });
@@ -429,5 +447,226 @@ describe('Product management', () => {
         await expect(listProducts()).rejects.toThrow('Unexpected product list');
         vi.mocked(fetch).mockRejectedValueOnce(new TypeError('offline'));
         await expect(deleteProduct(1)).rejects.toThrow('offline');
+    });
+    it('restores bookmarked search, nutrition bounds and page before the first request', async () => {
+        products = [
+            product(1, 'Oats one'),
+            product(2, 'Oats two'),
+            product(3, 'Oats three'),
+            product(4, 'Rice'),
+        ];
+        const { wrapper, router } = await mountApp(
+            '/products?search=oAtS&protein_min=10&protein_max=15&page=2',
+        );
+        expect(wrapper.get<HTMLInputElement>('#product-search').element.value).toBe('oAtS');
+        expect(wrapper.get<HTMLInputElement>('#filter-protein-min').element.value).toBe('10');
+        expect(wrapper.get('details').attributes('open')).toBeDefined();
+        expect(wrapper.get('.product-list').text()).toContain('Oats three');
+        expect(wrapper.text()).toContain('Page 2 of 2');
+        expect(router.currentRoute.value.query.page).toBe('2');
+        expect(fetch).toHaveBeenCalledWith(
+            '/api/products?page=2&search=oAtS&protein_min=10&protein_max=15',
+            expect.anything(),
+        );
+    });
+
+    it('debounces typing, encodes literal search and resets page in the URL', async () => {
+        products = [product(1), product(2), product(3)];
+        const { wrapper, router } = await mountApp('/products?page=2');
+        vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+        const before = vi.mocked(fetch).mock.calls.length;
+        await wrapper.get('#product-search').setValue('O');
+        await vi.advanceTimersByTimeAsync(200);
+        await wrapper.get('#product-search').setValue('Oats & 100%');
+        await vi.advanceTimersByTimeAsync(299);
+        expect(fetch).toHaveBeenCalledTimes(before);
+        expect(wrapper.text()).toContain('Loading products');
+        await vi.advanceTimersByTimeAsync(1);
+        await flushPromises();
+        expect(router.currentRoute.value.query).toEqual({ search: 'Oats & 100%' });
+        expect(fetch).toHaveBeenCalledWith(
+            '/api/products?page=1&search=Oats+%26+100%25',
+            expect.anything(),
+        );
+        expect(wrapper.text()).toContain('No products match your search and filters');
+    });
+
+    it('combines nutrition filters with search and preserves them during pagination', async () => {
+        products = [
+            product(1),
+            product(2),
+            product(3),
+            { ...product(4, 'Oats light'), protein_per_100g: '1.00' },
+        ];
+        const { wrapper, router } = await mountApp();
+        vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+        await wrapper.get('#product-search').setValue('oats');
+        await wrapper.get('#filter-protein-min').setValue('10');
+        await wrapper.get('#filter-fat-max').setValue('7');
+        await vi.advanceTimersByTimeAsync(300);
+        await flushPromises();
+        expect(wrapper.text()).toContain('Page 1 of 2 · 3 products');
+        await button(wrapper, 'Next').trigger('click');
+        await flushPromises();
+        expect(router.currentRoute.value.query).toEqual({
+            search: 'oats',
+            protein_min: '10',
+            fat_max: '7',
+            page: '2',
+        });
+        expect(wrapper.get('.product-list').text()).not.toContain('Oats light');
+        expect(fetch).toHaveBeenCalledWith(
+            '/api/products?page=2&search=oats&protein_min=10&fat_max=7',
+            expect.anything(),
+        );
+    });
+
+    it('clears search, all ranges and pagination together', async () => {
+        products.push(product(2), product(3));
+        const { wrapper, router } = await mountApp('/products?search=oats&protein_min=10&page=2');
+        await button(wrapper, 'Clear search and filters').trigger('click');
+        await flushPromises();
+        expect(router.currentRoute.value.query).toEqual({});
+        expect(wrapper.get<HTMLInputElement>('#product-search').element.value).toBe('');
+        expect(wrapper.get<HTMLInputElement>('#filter-protein-min').element.value).toBe('');
+        expect(wrapper.text()).toContain('Page 1 of 2');
+    });
+
+    it('restores controls and results through browser back and forward', async () => {
+        products = [product(1), product(2), product(3), product(4, 'Milk')];
+        const { wrapper, router } = await mountApp('/products?search=Oats');
+        await button(wrapper, 'Next').trigger('click');
+        await flushPromises();
+        await router.push('/products?search=Milk&protein_min=0');
+        await flushPromises();
+        router.back();
+        await flushPromises();
+        expect(wrapper.get<HTMLInputElement>('#product-search').element.value).toBe('Oats');
+        expect(wrapper.text()).toContain('Page 2 of 2');
+        router.forward();
+        await flushPromises();
+        expect(wrapper.get<HTMLInputElement>('#product-search').element.value).toBe('Milk');
+        expect(wrapper.get<HTMLInputElement>('#filter-protein-min').element.value).toBe('0');
+        expect(wrapper.get('.product-list').text()).toContain('Milk');
+    });
+
+    it('ignores stale requests as soon as a new search is typed', async () => {
+        products = [product(1), product(2), product(3, 'Milk')];
+        const { wrapper } = await mountApp();
+        let resolve: ((response: Response) => void) | undefined;
+        hold = {
+            method: 'GET',
+            response: new Promise((done) => {
+                resolve = done;
+            }),
+        };
+        await button(wrapper, 'Next').trigger('click');
+        await flushPromises();
+        vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+        await wrapper.get('#product-search').setValue('Milk');
+        hold = undefined;
+        await vi.advanceTimersByTimeAsync(300);
+        await flushPromises();
+        expect(wrapper.get('.product-list').text()).toContain('Milk');
+        resolve?.(
+            json({
+                data: [product(99, 'Stale product')],
+                meta: { current_page: 2, last_page: 2, total: 3 },
+            }),
+        );
+        await flushPromises();
+        expect(wrapper.get('.product-list').text()).toContain('Milk');
+        expect(wrapper.text()).not.toContain('Stale product');
+    });
+
+    it('shows field-specific filter errors and recovers after correction', async () => {
+        const { wrapper } = await mountApp();
+        vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+        failure = {
+            method: 'GET',
+            status: 422,
+            body: { errors: { protein_max: ['Maximum protein must be at least the minimum.'] } },
+        };
+        await wrapper.get('#filter-protein-min').setValue('10');
+        await wrapper.get('#filter-protein-max').setValue('5');
+        await vi.advanceTimersByTimeAsync(300);
+        await flushPromises();
+        expect(wrapper.get('#filter-protein-max').attributes('aria-invalid')).toBe('true');
+        expect(wrapper.get('#filter-protein-max-error').text()).toContain('at least the minimum');
+        failure = undefined;
+        await wrapper.get('#filter-protein-max').setValue('20');
+        await vi.advanceTimersByTimeAsync(300);
+        await flushPromises();
+        expect(wrapper.get('.product-list').text()).toContain('Oats');
+        expect(wrapper.get('#filter-protein-max-error').text()).toBe('');
+    });
+
+    it('does not lose zero-valued bounds or clear criteria after CRUD', async () => {
+        products = [{ ...product(1, 'Water'), protein_per_100g: '0.00' }, product(2)];
+        const { wrapper, router } = await mountApp('/products?protein_min=0&protein_max=0');
+        expect(wrapper.get('.product-list').text()).toContain('Water');
+        expect(wrapper.get('.product-list').text()).not.toContain('Oats');
+        await wrapper.get('button[aria-label="Edit Water"]').trigger('click');
+        await wrapper.get('#product-name').setValue('Clear water');
+        await wrapper.get('form').trigger('submit');
+        await flushPromises();
+        expect(router.currentRoute.value.query).toEqual({ protein_min: '0', protein_max: '0' });
+        expect(wrapper.get('.product-list').text()).toContain('Clear water');
+    });
+
+    it('reloads the original query when typing is reverted before debounce completes', async () => {
+        const { wrapper } = await mountApp('/products?search=Oats');
+        vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+        await wrapper.get('#product-search').setValue('Oats new');
+        await wrapper.get('#product-search').setValue('Oats');
+        await flushPromises();
+        expect(wrapper.get('.product-list').text()).toContain('Oats');
+        expect(wrapper.text()).not.toContain('Loading products');
+    });
+
+    it('cancels queued searches when navigating away', async () => {
+        const { wrapper, router } = await mountApp();
+        vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+        await wrapper.get('#product-search').setValue('Milk');
+        await router.push('/about');
+        await flushPromises();
+        const before = vi.mocked(fetch).mock.calls.length;
+        await vi.advanceTimersByTimeAsync(1000);
+        await flushPromises();
+        expect(router.currentRoute.value.name).toBe('about');
+        expect(fetch).toHaveBeenCalledTimes(before);
+    });
+    it('does not overwrite newer typing when an earlier URL navigation finishes late', async () => {
+        const { wrapper, router } = await mountApp();
+        vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+        let resume: ((response: Response) => void) | undefined;
+        vi.mocked(fetch).mockImplementationOnce(
+            () =>
+                new Promise<Response>((resolve) => {
+                    resume = resolve;
+                }),
+        );
+        await wrapper.get('#product-search').setValue('Oat');
+        await vi.advanceTimersByTimeAsync(300);
+        await wrapper.get('#product-search').setValue('Oats latest');
+        await vi.advanceTimersByTimeAsync(100);
+        resume?.(json({ user }));
+        await flushPromises();
+        expect(wrapper.get<HTMLInputElement>('#product-search').element.value).toBe('Oats latest');
+        await vi.advanceTimersByTimeAsync(200);
+        await flushPromises();
+        expect(router.currentRoute.value.query.search).toBe('Oats latest');
+    });
+    it('preserves a trailing space when a user pauses between words', async () => {
+        const { wrapper, router } = await mountApp();
+        vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+        await wrapper.get('#product-search').setValue('Rolled ');
+        await vi.advanceTimersByTimeAsync(300);
+        await flushPromises();
+        expect(wrapper.get<HTMLInputElement>('#product-search').element.value).toBe('Rolled ');
+        await wrapper.get('#product-search').setValue('Rolled Oats');
+        await vi.advanceTimersByTimeAsync(300);
+        await flushPromises();
+        expect(router.currentRoute.value.query.search).toBe('Rolled Oats');
     });
 });

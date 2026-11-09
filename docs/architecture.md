@@ -130,7 +130,8 @@ flowchart LR
 - **PostgreSQL:** intended persistent storage, with a configured `pgsql` connection
   and running development service. Eloquent persists user accounts; the `SELECT 1`
   connectivity probe remains. The Product model/schema exists and is exercised in
-  isolated PostgreSQL tests; its development migration is still pending. Recipe and
+  isolated PostgreSQL tests; read-only TASK-16 inspection confirms its development
+  migration is applied. Recipe and
   consumption schemas remain future work.
 
 ## Routing
@@ -162,6 +163,12 @@ with `auth`, owner-scoped route binding, Policy authorization and no-store respo
 TASK-15 adds the protected `/products` HTML entry and Vue route, reserving that
 namespace from Laravel and PWA fallbacks. Product UI state remains local to the page;
 its typed API calls share the established cookie/XSRF transport with authentication.
+TASK-16 extends the existing GET listing with validated literal name/brand search
+and inclusive per-100-g nutrient ranges. Grouped bound-parameter SQL preserves the
+owner relationship before filtering, totals and pagination; no index/schema or
+external search service is added. The Vue filter component and URL-state composable
+preserve criteria/page across refresh and history navigation, debounce typing and
+ignore stale requests/navigation. See [Product UI](product-ui.md) and the API contract.
 `/api/products` supports GET/POST and `/{product}` supports GET/PUT/PATCH/DELETE.
 The API prefix is already reserved from both SPA and PWA fallbacks. See
 [product-api.md](product-api.md) for validation and response contracts.
@@ -225,7 +232,8 @@ constraints enforce valid ranges and a required owner foreign key with restricte
 deletion. User/Product relationships and a real, automatically discovered Product
 Policy establish ownership boundaries. TASK-14 adds Product CRUD using those
 relationships and Policy without changing the schema. TASK-15 adds the Vue
-management UI using those endpoints; the migration remains pending in development. The canonical isolated
+management UI using those endpoints. Read-only TASK-16 inspection now confirms the
+existing products migration is applied in development; no migration ran in TASK-16. The canonical isolated
 PostgreSQL suite verifies precision and constraints; optional SQLite tests provide
 model smoke coverage. See [products.md](products.md) for the schema and rationale.
 

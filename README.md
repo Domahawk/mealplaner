@@ -37,6 +37,8 @@ Two-user tests verify existing account boundaries. Unknown `/account/...` paths
 return 404. The authenticated [Product REST API](docs/product-api.md) supports owned
 product CRUD, validation and pagination. The [Products interface](docs/product-ui.md)
 now provides create/edit forms, deletion confirmation and pagination at `/products`.
+TASK-16 adds case-insensitive name/brand search, optional nutrition ranges and
+shareable URL state, with debounced requests and filtered pagination.
 Recipes and food logs have no endpoints yet.
 
 [TASK-12 security verification](docs/security-verification.md) covers the current
@@ -54,12 +56,13 @@ The User and Product models, migrations, native factories and Product Policy exi
 The [product data model](docs/products.md) stores exact per-100-g nutrition and optional
 package information. Product CRUD endpoints and the integrated Vue UI now exist;
 recipe/food-log schemas remain future work;
-the products migration has not been applied to development. PostgreSQL 18.6
+read-only TASK-16 inspection now confirms the products migration is applied in
+development. TASK-16 ran no development migrations. PostgreSQL 18.6
 connectivity, existing migration compatibility, and committed-record persistence
 across reconnects are verified in an isolated test database. Development migration
 history now records the users migration, applied only after confirming the local
 database was empty. Read-only TASK-13 status inspection shows the existing users
-and cache migrations applied and the new products migration pending; TASK-13 ran
+and cache migrations applied and the new products migration pending at that time; TASK-13 ran
 no development migration. Local cache and sessions use files. Docker lifecycle verification is recorded in [VERIFICATION.md](docs/VERIFICATION.md);
 Mealplaner domain workflows remain future work. See [database.md](docs/database.md).
 
@@ -280,20 +283,29 @@ unrelated application feature is introduced.
 
 ## Verification commands and current results
 
+TASK-16 passes **62 frontend tests**, **303 PostgreSQL tests / 5,773 assertions**,
+**265 optional SQLite tests / 3,142 assertions**, both quality gates and production
+build/artifact checks. Frontend line coverage is **94.64%**. Chrome verified combined
+search/ranges, filtered pagination, bookmark/history restoration, field errors,
+owner isolation, CRUD preservation and mobile/desktop light/dark layouts. Read-only
+status now shows the existing products migration applied; TASK-16 ran no development
+migration. See the [API contract](docs/product-api.md), [UI guide](docs/product-ui.md)
+and [verification record](docs/VERIFICATION.md).
+
 TASK-15 passes **50 frontend tests**, **224 PostgreSQL tests / 4,267 assertions**,
 both quality gates and production build/artifact checks. Frontend line coverage is
 **93.60%**. Chrome verified real registration/session/XSRF, product CRUD and pagination,
 private route reload/logout protection and responsive light/dark layouts using an
 isolated testing database. See [Product UI](docs/product-ui.md) and the
 [verification record](docs/VERIFICATION.md). The development products migration
-remains pending; no development data or schema was changed.
+was pending at TASK-15; TASK-16 now records it applied without running migrations.
 
 TASK-14 passes **223 PostgreSQL tests / 4,244 assertions**, **185 optional SQLite
 tests / 2,253 assertions**, **32 frontend tests**, both quality gates and production
 build/artifact checks. PHP app/routes coverage is **99.40% (165/166 statements)**.
 Authenticated CRUD, owner boundaries, precise validation, pagination and real
 login-cookie/CSRF/logout integration are verified in isolated testing databases.
-The development products migration remains pending; see [Product API setup](docs/product-api.md).
+The development products migration was pending at TASK-14; see current [Product API setup](docs/product-api.md).
 
 TASK-13 passes **126 PostgreSQL tests / 2,100 assertions**, **88 SQLite tests /
 885 assertions**, **32 frontend tests**, both quality gates and production build

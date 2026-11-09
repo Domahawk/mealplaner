@@ -622,3 +622,54 @@ h2 {
         text-align: center;
     }
 }
+
+.product-filters {
+    display: grid;
+    gap: 10px;
+    margin: 24px 0;
+    padding: 20px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--surface);
+}
+.product-filters input {
+    width: 100%;
+    min-width: 0;
+    padding: 12px;
+    font: inherit;
+    color: var(--text);
+    background: var(--background);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+}
+.product-filters input:focus-visible,
+.product-filters summary:focus-visible {
+    outline: 3px solid var(--accent);
+    outline-offset: 3px;
+}
+.product-filters input[aria-invalid='true'] {
+    border: 2px solid var(--accent);
+}
+.product-filters summary {
+    padding: 12px 0;
+    cursor: pointer;
+}
+.nutrition-filter-grid {
+    display: grid;
+    gap: 16px;
+    margin-top: 16px;
+}
+.nutrition-filter-grid fieldset {
+    min-width: 0;
+    margin: 0;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 16px;
+    display: grid;
+    gap: 12px;
+}
+@media (min-width: 701px) {
+    .nutrition-filter-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}

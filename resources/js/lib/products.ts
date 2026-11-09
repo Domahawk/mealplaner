@@ -23,6 +23,34 @@ export interface ProductPage {
     total: number;
 }
 
+export const productFilterKeys = [
+    'search',
+    'calories_min',
+    'calories_max',
+    'protein_min',
+    'protein_max',
+    'carbohydrates_min',
+    'carbohydrates_max',
+    'fat_min',
+    'fat_max',
+] as const;
+export type ProductFilterKey = (typeof productFilterKeys)[number];
+export type ProductFilters = Record<ProductFilterKey, string>;
+
+export function emptyProductFilters(): ProductFilters {
+    return {
+        search: '',
+        calories_min: '',
+        calories_max: '',
+        protein_min: '',
+        protein_max: '',
+        carbohydrates_min: '',
+        carbohydrates_max: '',
+        fat_min: '',
+        fat_max: '',
+    };
+}
+
 function isProduct(value: unknown): value is Product {
     return (
         isRecord(value) &&
@@ -74,8 +102,15 @@ async function request(
     return data;
 }
 
-export async function listProducts(page = 1): Promise<ProductPage> {
-    const body = await request(`/api/products?page=${page}`, 'GET');
+export async function listProducts(
+    page = 1,
+    filters = emptyProductFilters(),
+): Promise<ProductPage> {
+    const query = new URLSearchParams({ page: String(page) });
+    for (const key of productFilterKeys) {
+        if (filters[key].trim()) query.set(key, filters[key].trim());
+    }
+    const body = await request(`/api/products?${query}`, 'GET');
     if (
         isRecord(body) &&
         Array.isArray(body.data) &&

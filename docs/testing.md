@@ -157,6 +157,16 @@ the shared request transport. The dialog shim covers JSDOM's missing methods onl
 Chrome separately verifies native focus/Escape/background inertness. Backend tests
 cover the protected `/products` HTML entry and its reserved fallback namespace.
 
+TASK-16 adds `tests/Feature/ProductSearchTest.php` for literal case-insensitive
+name/brand matching, grouped owner isolation, combined inclusive nutrition bounds,
+zero/empty bounds, invalid ranges/types/precision and filtered pagination links.
+`tests/frontend/products.test.ts` extends the existing real App/router fixtures with
+URL restoration/history, debounce, filtered pagination, field errors, clearing,
+zero bounds, CRUD preservation, stale results, delayed-navigation and multiword
+search regressions. Fake timers apply only to debounce cases and are restored after
+each test. Canonical PostgreSQL remains authoritative; optional SQLite exercises the
+same parameterized substring query for ASCII cases without changing test isolation.
+
 ## Coverage and reports
 
 The PHP development image includes pinned **Xdebug 3.5.3**, with `xdebug.mode=off`
