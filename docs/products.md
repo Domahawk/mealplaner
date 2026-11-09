@@ -57,9 +57,11 @@ and CSRF protection as described in [authorization.md](authorization.md).
 
 The owner foreign key uses `ON DELETE RESTRICT` to prevent implicit product loss
 when deleting an account. A future account deletion workflow must handle owned data
-deliberately. Product IDs can be referenced by later recipe/food-log foreign keys;
-those tables, reference validation, nutrition snapshots and deletion/history rules
-will be designed in their own tasks. No soft-delete or historical-data scheme is
+deliberately. TASK-18 now references Products through the [recipe ingredient pivot](recipes.md).
+Composite ownership FKs restrict referenced product deletion and prevent cross-user
+links. Product DELETE returns 409 while referenced; detaching its recipe uses allows
+deletion again. Food-log references, nutrition snapshots and historical deletion
+rules remain future work. No soft-delete or historical-data scheme is
 introduced here.
 
 ## Factories, verification and migration safety

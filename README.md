@@ -52,10 +52,13 @@ Planned MVP capabilities, **not yet implemented**:
 3. Record consumption by date.
 4. View daily calorie and macronutrient totals.
 
-The User and Product models, migrations, native factories and Product Policy exist.
+The User, Product and Recipe models, migrations, native factories and ownership
+Policies exist. TASK-18 adds recipe/ingredient persistence and safe product-reference
+deletion; recipe HTTP/UI and nutrition calculations remain future work.
 The [product data model](docs/products.md) stores exact per-100-g nutrition and optional
 package information. Product CRUD endpoints and the integrated Vue UI now exist;
-recipe/food-log schemas remain future work;
+the recipe/ingredient schema is defined but its development migrations remain pending;
+food-log schema remains future work;
 read-only TASK-16 inspection now confirms the products migration is applied in
 development. TASK-16 ran no development migrations. PostgreSQL 18.6
 connectivity, existing migration compatibility, and committed-record persistence
@@ -93,10 +96,10 @@ installed packages. Use the existing container workflow.
 ## Repository structure
 
 ```text
-app/                       Laravel controllers, Form Requests, User/Product models, Policy and provider
+app/                       Laravel controllers, Form Requests, User/Product/Recipe models and Policies
 bootstrap/                 Laravel startup and route registration
 config/                    Laravel configuration
-database/                  Cache/cache-lock, users and products migrations; factories; empty seeder
+database/                  Cache/users/products/recipes/ingredient migrations and factories; empty seeder
 resources/js/              Integrated Vue SPA: views, components, router, stores,
                            composables, and same-origin API helper
 resources/css/app.css      Responsive application and theme styling
@@ -283,6 +286,14 @@ unrelated application feature is introduced.
 
 ## Verification commands and current results
 
+TASK-18 passes **367 PostgreSQL tests / 6,803 assertions**, **303 optional SQLite
+tests / 3,457 assertions**, **63 frontend tests**, both quality gates and production
+build/artifact checks. Recipes and ingredients now have validated relationships,
+same-owner model/database constraints and safe cascade/restrict behavior. Referenced
+Product deletion returns 409 with a clear dialog message. Both new migrations remain
+pending in development; no development records were changed. See the
+[recipe data model](docs/recipes.md) and [verification record](docs/VERIFICATION.md).
+
 TASK-16 passes **62 frontend tests**, **303 PostgreSQL tests / 5,773 assertions**,
 **265 optional SQLite tests / 3,142 assertions**, both quality gates and production
 build/artifact checks. Frontend line coverage is **94.64%**. Chrome verified combined
@@ -410,6 +421,8 @@ setup, and its HMR test temporarily edits source. Do not remove database volumes
   confirmation, pagination, request/session handling and local prerequisites.
 - [Product API](docs/product-api.md): session-authenticated CRUD endpoints, JSON shapes,
   precision validation, pagination and ownership enforcement.
+- [Recipe data model](docs/recipes.md): ingredient quantities, same-owner constraints,
+  relationships, factories, safe deletion and TASK-19 HTTP boundaries.
 - [Product data model](docs/products.md): per-100-g units, exact decimals, constraints,
   ownership, factories and future reference boundaries.
 - [Database guide](docs/database.md): PostgreSQL requirements, safe migration workflow,

@@ -1,5 +1,14 @@
 # PostgreSQL persistence
 
+## Recipe migrations (TASK-18)
+
+Two new migrations define recipes and their ingredient pivot. They remain pending
+in development; TASK-18 ran only ordinary migrations in generated testing databases.
+The pivot migration adds a unique Product `(id, user_id)` target for composite owner
+foreign keys, without changing Product rows or its original migration. Recipe
+cascade/product restriction behavior and same-owner integrity are documented in
+[recipes.md](recipes.md). Follow the reviewed migration workflow when applying them.
+
 ## Current migration status (TASK-16)
 
 Read-only inspection on 2026-11-09 shows the existing users, cache and products

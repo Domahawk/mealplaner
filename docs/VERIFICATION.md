@@ -1,5 +1,109 @@
 # Verification record
 
+## TASK-18 — Recipe models and relationships (2026-11-09)
+
+Created `feature/task-18-recipe-models` from clean local `main` at `908b48b` before
+editing. Extended the existing root Laravel application, Product model and guarded
+database infrastructure without dependencies, recipe routes/UI or calculations.
+
+### Schema, relationships and deletion
+
+Added `recipes` with bigint ID/owner FK, nonblank name, nullable text description,
+positive integer servings and timestamps. Added `recipe_product` with a stable pivot
+ID, recipe/product/derived-owner IDs, exact `numeric(10,3)` positive gram quantity,
+timestamps and unique recipe/product pairs. No nutritional or weight totals are stored.
+The custom `RecipeIngredient` Pivot supports native relationship writes, factories,
+casts and direct record updates/deletes. User/Recipe ownership, Recipe ingredients,
+Recipe/Product many-to-many and Product ingredient relationships are typed.
+
+Model saves validate names, servings and quantity precision/ranges. Ingredient saves
+derive the recipe owner and reject unavailable/foreign products. Two composite foreign
+keys share the non-null pivot owner, referencing unique `(id, user_id)` targets on
+recipes/products. Direct SQL cannot create cross-user ingredients or change referenced
+parent ownership. The extra Product index is introduced by the new pivot migration;
+existing migration files and Product rows are unchanged. [Schema details](recipes.md).
+
+Recipe deletion cascades only ingredient associations; products and other recipes
+remain. User deletion with recipes and product deletion while referenced are restricted.
+The existing Product DELETE transaction catches the specific recipe FK failure after
+rollback and returns 409; unrelated database errors are rethrown. Normal unreferenced
+deletion remains 204. The existing Product dialog explains that conflict. These narrow
+Product API/client changes are needed to preserve usable deletion behavior when the
+new foreign key starts restricting a real reference; no recipe UI was introduced.
+
+`RecipePolicy` is discovered through standard Laravel conventions. Recipe ownership
+cannot be mass-assigned; ingredient recipe/owner IDs cannot be mass-assigned either.
+TASK-19 still must implement and test HTTP authentication, scoped queries, requests,
+Policy calls, referenced-product ownership checks and atomic ingredient batch writes.
+Model and database safeguards do not replace those request boundaries.
+
+### Files changed
+
+Created:
+
+- `app/Models/{Recipe,RecipeIngredient}.php`
+- `app/Policies/RecipePolicy.php`
+- `database/factories/{Recipe,RecipeIngredient}Factory.php`
+- `database/migrations/2026_11_09_000000_create_recipes_table.php`
+- `database/migrations/2026_11_09_000001_create_recipe_product_table.php`
+- `tests/{Feature,Postgres}/RecipeTest.php`
+- `docs/recipes.md`
+
+Modified: `app/Models/{User,Product}.php`, `app/Http/Controllers/ProductController.php`,
+`resources/js/lib/products.ts`, `tests/frontend/products.test.ts`, `README.md`,
+`docs/{architecture,authorization,database,product-api,products,testing,VERIFICATION}.md`.
+
+### Executed verification
+
+Commands used existing Docker services with `--user app backend` for PHP and
+`--user node frontend` for npm. Both lockfiles, dependency manifests, runtime and
+quality configurations are unchanged. Existing test bootstrap, generated restricted
+PostgreSQL identity checks and transaction isolation remain mandatory.
+
+| Check                                         | Result                                                                                                                                                                                  |
+| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `composer quality`                            | Passed: Pint 67 files and PHPStan/Larastan level 8, no errors.                                                                                                                          |
+| `composer test`                               | Initial model/integration suite passed: 339 tests, 6,359 assertions.                                                                                                                    |
+| `composer test:coverage`                      | Final expanded full suite passed: 367 tests, 6,803 assertions, no skips. App/routes line coverage 99.15% (232/234), HTML/Clover generated. Temporary PostgreSQL database/login removed. |
+| `composer test:sqlite`                        | Passed: 303 tests, 3,457 assertions, memory-only suite.                                                                                                                                 |
+| `npm run quality`                             | Passed: zero-warning ESLint, Prettier and strict Vue TSC.                                                                                                                               |
+| `npm run test:unit` / `npm run test:coverage` | Passed: 63 tests, including the referenced-product dialog regression; frontend line coverage 94.64% (495/523), HTML/LCOV/summary generated.                                             |
+| `npm run build` / `npm run verify:build`      | Passed: 60 modules, integrated Vite/PWA production assets and artifact checks.                                                                                                          |
+| `php artisan migrate:status`                  | Read-only: users/cache/products remain applied; both recipe migrations pending. No development migration ran.                                                                           |
+
+Feature tests verify same-owner factories, nullable description, typed servings,
+bidirectional multiple-product/multiple-recipe relationships, custom-pivot decimal
+strings/updates/deletes, duplicate pairs, RecipePolicy discovery, protected ownership,
+missing parents and foreign-product rejection through attach/reverse/sync/pivot-update/
+relationship/factory paths. Batch tests explicitly use transactions and verify rollback.
+Guest/foreign/owner Product deletion tests preserve 401/404/409 boundaries; detaching
+permits normal 204 deletion without removing the recipe.
+
+PostgreSQL cases bypass model validation to prove non-null/positive/range/text/FK
+constraints, rejection of non-finite quantities, exact numeric column/storage metadata,
+composite index targets, cross-user rejection for either forged pivot owner, parent
+ownership immutability, recipe cascades and product/user deletion restrictions.
+No tests wrote to development or used reset/fresh/refresh commands.
+
+Static analysis initially identified an ambiguous factory `findOrFail` result and
+nullable related owner. The factory now uses typed `whereKey()->firstOrFail()` and
+`user()->firstOrFail()` instead of assertions/suppressions. Final tests and checks
+pass. No tooling was installed, weakened or given an ignore baseline.
+
+Read-only HTTP checks against the normal Nginx origin returned health and readiness
+JSON 200; health retained exact `{"status":"ok"}`. Guest Product API returned JSON 401. Browser/HMR and hosted CI were not repeated: the only frontend behavior change
+is the tested deletion-conflict message, and production build verification passed.
+
+### Remaining scope and safety
+
+Both new migrations remain pending in development; apply them only through the reviewed
+migration workflow after confirming the target. No existing development user/product
+record, environment/key, database volume, original migration or dependency was changed.
+Recipes store current product references, not historical nutrition snapshots. Recipe
+HTTP enforcement belongs to TASK-19; calculations, recipe UI and food logs are later
+work. No commit, push, merge or PR creation occurred. Active branch:
+`feature/task-18-recipe-models`.
+
 ## TASK-16 — Product search and filtering (2026-11-09)
 
 Created `feature/task-16-product-search` from clean local `main` at `203e8f8` before
