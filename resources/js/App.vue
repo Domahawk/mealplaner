@@ -63,6 +63,7 @@ watch(
                 <RouterLink to="/" exact-active-class="active">Home</RouterLink>
                 <RouterLink to="/about" active-class="active">About</RouterLink>
                 <template v-if="auth.user">
+                    <RouterLink to="/products" active-class="active">Products</RouterLink>
                     <RouterLink to="/account" active-class="active">Account</RouterLink>
                     <button
                         type="button"

@@ -98,5 +98,6 @@ test('production PWA installs, precaches assets, and reopens a client route offl
     ).toBeVisible();
     // Private server routes must not be replaced by the public offline shell.
     await expect(page.goto('/account')).rejects.toThrow();
+    await expect(page.goto('/products')).rejects.toThrow();
     await context.setOffline(false);
 });

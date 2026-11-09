@@ -35,7 +35,9 @@ records the earlier baseline.
 session-owned identity and the scoped queries/Policies required for future resources.
 Two-user tests verify existing account boundaries. Unknown `/account/...` paths
 return 404. The authenticated [Product REST API](docs/product-api.md) supports owned
-product CRUD, validation and pagination. Recipes and food logs have no endpoints yet.
+product CRUD, validation and pagination. The [Products interface](docs/product-ui.md)
+now provides create/edit forms, deletion confirmation and pagination at `/products`.
+Recipes and food logs have no endpoints yet.
 
 [TASK-12 security verification](docs/security-verification.md) covers the current
 account flows, session invalidation/concurrency, CSRF, throttling and client-state
@@ -43,15 +45,14 @@ handling. It records resolved defects and the limits of local MVP verification.
 
 Planned MVP capabilities, **not yet implemented**:
 
-1. Product management screens using the implemented CRUD API.
-2. Create recipes from existing products and specified quantities.
-3. Calculate recipe calories, protein, carbohydrates, and fat automatically.
-4. Record consumption by date.
-5. View daily calorie and macronutrient totals.
+1. Create recipes from existing products and specified quantities.
+2. Calculate recipe calories, protein, carbohydrates, and fat automatically.
+3. Record consumption by date.
+4. View daily calorie and macronutrient totals.
 
 The User and Product models, migrations, native factories and Product Policy exist.
 The [product data model](docs/products.md) stores exact per-100-g nutrition and optional
-package information. Product CRUD endpoints now exist; frontend integration and
+package information. Product CRUD endpoints and the integrated Vue UI now exist;
 recipe/food-log schemas remain future work;
 the products migration has not been applied to development. PostgreSQL 18.6
 connectivity, existing migration compatibility, and committed-record persistence
@@ -119,7 +120,7 @@ existing Pinia instance and Vue Router, and mounts `App.vue` into `#app`.
 There is one root package manifest, lockfile, Vite configuration, and deployment.
 
 HTML5-history routes include `/` (`welcome` route name), `/about`, `/login`,
-`/register`, protected `/account`, and the Not Found catch-all, with page-specific
+`/register`, protected `/account` and `/products`, and the Not Found catch-all, with page-specific
 titles. Laravel continues handling API, health, storage, and worker namespaces
 separately. Pinia stores manage theme, connectivity and session-backed account state.
 The authentication guard restores server-owned identity before private navigation;
@@ -279,6 +280,14 @@ unrelated application feature is introduced.
 
 ## Verification commands and current results
 
+TASK-15 passes **50 frontend tests**, **224 PostgreSQL tests / 4,267 assertions**,
+both quality gates and production build/artifact checks. Frontend line coverage is
+**93.60%**. Chrome verified real registration/session/XSRF, product CRUD and pagination,
+private route reload/logout protection and responsive light/dark layouts using an
+isolated testing database. See [Product UI](docs/product-ui.md) and the
+[verification record](docs/VERIFICATION.md). The development products migration
+remains pending; no development data or schema was changed.
+
 TASK-14 passes **223 PostgreSQL tests / 4,244 assertions**, **185 optional SQLite
 tests / 2,253 assertions**, **32 frontend tests**, both quality gates and production
 build/artifact checks. PHP app/routes coverage is **99.40% (165/166 statements)**.
@@ -385,6 +394,8 @@ setup, and its HMR test temporarily edits source. Do not remove database volumes
   component tests, coverage, JUnit artifacts, and unattended CI commands.
 - [Verification record](docs/VERIFICATION.md): current stabilization results and the
   historical architecture-audit baseline.
+- [Product UI](docs/product-ui.md): authenticated product management, form feedback,
+  confirmation, pagination, request/session handling and local prerequisites.
 - [Product API](docs/product-api.md): session-authenticated CRUD endpoints, JSON shapes,
   precision validation, pagination and ownership enforcement.
 - [Product data model](docs/products.md): per-100-g units, exact decimals, constraints,

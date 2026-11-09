@@ -16,8 +16,7 @@ TASK-10 completes registration/login/logout within that starter. Mealplaner's
 **MVP v0.1.0** domain features are planned: user-owned nutritional products; recipes and
 quantity-based nutrition calculation; dated consumption records; and daily calorie,
 protein, carbohydrate, and fat totals. TASK-13 adds the Product persistence model
-and ownership Policy; TASK-14 adds authenticated Product CRUD endpoints. Product UI
-and recipe/food-log workflows remain unimplemented.
+and ownership Policy; TASK-14 adds authenticated Product CRUD endpoints. TASK-15 adds the integrated Product UI; recipe/food-log workflows remain unimplemented.
 
 ## Detected technology and versions
 
@@ -117,7 +116,8 @@ flowchart LR
   CRUD with Form Requests, Policy checks and API Resources. Future recipe/log logic
   and nutrition calculations extend these boundaries.
 - **Vue:** Mealplaner Home/about/not-found screens, route titles and keyboard focus,
-  navigation, responsive presentation,
+  navigation, authenticated Product CRUD forms/cards/pagination and deletion dialog,
+  responsive presentation,
   loading/error/success connectivity states, theme preference, and PWA update notice.
   Future user workflows extend these existing components and conventions.
 - **Pinia:** `theme`, `connection` and `auth` stores support real shared state.
@@ -159,6 +159,9 @@ TASK-10 adds login/register views, a protected account view and frontend session
 checks. Laravel also protects the account entry and `/api/auth/user` with native
 `auth` middleware. TASK-14 registers the Product API in the same web/session group,
 with `auth`, owner-scoped route binding, Policy authorization and no-store responses.
+TASK-15 adds the protected `/products` HTML entry and Vue route, reserving that
+namespace from Laravel and PWA fallbacks. Product UI state remains local to the page;
+its typed API calls share the established cookie/XSRF transport with authentication.
 `/api/products` supports GET/POST and `/{product}` supports GET/PUT/PATCH/DELETE.
 The API prefix is already reserved from both SPA and PWA fallbacks. See
 [product-api.md](product-api.md) for validation and response contracts.
@@ -221,8 +224,8 @@ columns store kcal/macronutrients per 100 g and optional package grams; PostgreS
 constraints enforce valid ranges and a required owner foreign key with restricted
 deletion. User/Product relationships and a real, automatically discovered Product
 Policy establish ownership boundaries. TASK-14 adds Product CRUD using those
-relationships and Policy without changing the schema. No product UI exists, and the
-migration remains pending in development. The canonical isolated
+relationships and Policy without changing the schema. TASK-15 adds the Vue
+management UI using those endpoints; the migration remains pending in development. The canonical isolated
 PostgreSQL suite verifies precision and constraints; optional SQLite tests provide
 model smoke coverage. See [products.md](products.md) for the schema and rationale.
 

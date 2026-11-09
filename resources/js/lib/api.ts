@@ -39,7 +39,7 @@ export interface AuthUser {
     email: string;
 }
 
-export class AuthenticationError extends Error {
+export class ApiError extends Error {
     constructor(
         message: string,
         readonly status: number,
@@ -49,46 +49,61 @@ export class AuthenticationError extends Error {
     }
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+export class AuthenticationError extends ApiError {}
+
+export function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null;
 }
 
-export async function authRequest(
-    action: 'session' | 'login' | 'register' | 'logout',
-    body?: Record<string, string>,
-): Promise<AuthUser | null> {
+export function validationErrors(data: unknown): Record<string, string[]> {
+    const errors: Record<string, string[]> = {};
+    if (isRecord(data) && isRecord(data.errors)) {
+        for (const [field, messages] of Object.entries(data.errors)) {
+            if (
+                Array.isArray(messages) &&
+                messages.every((message) => typeof message === 'string')
+            ) {
+                errors[field] = messages;
+            }
+        }
+    }
+    return errors;
+}
+
+// Shared same-origin transport; callers retain their own response contracts.
+export function jsonRequest(
+    path: string,
+    method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
+    body?: object,
+): Promise<Response> {
     const headers: Record<string, string> = { Accept: 'application/json' };
-    if (body) {
+    if (method !== 'GET') {
         headers['Content-Type'] = 'application/json';
         const cookie = document.cookie.split('; ').find((entry) => entry.startsWith('XSRF-TOKEN='));
         if (cookie)
             headers['X-XSRF-TOKEN'] = decodeURIComponent(cookie.slice('XSRF-TOKEN='.length));
     }
-
-    const response = await fetch(`/api/auth/${action}`, {
-        method: body ? 'POST' : 'GET',
+    return fetch(path, {
+        method,
         headers,
         credentials: 'same-origin',
         cache: 'no-store',
         signal: AbortSignal.timeout(8000),
         ...(body ? { body: JSON.stringify(body) } : {}),
     });
+}
+
+export async function authRequest(
+    action: 'session' | 'login' | 'register' | 'logout',
+    body?: Record<string, string>,
+): Promise<AuthUser | null> {
+    const response = await jsonRequest(`/api/auth/${action}`, body ? 'POST' : 'GET', body);
 
     if (response.status === 204 && action === 'logout') return null;
     // Preserve authentication status handling even for an empty/non-JSON error body.
     const data: unknown = await response.json().catch(() => null);
     if (!response.ok) {
-        const errors: Record<string, string[]> = {};
-        if (response.status === 422 && isRecord(data) && isRecord(data.errors)) {
-            for (const [field, messages] of Object.entries(data.errors)) {
-                if (
-                    Array.isArray(messages) &&
-                    messages.every((message) => typeof message === 'string')
-                ) {
-                    errors[field] = messages;
-                }
-            }
-        }
+        const errors = response.status === 422 ? validationErrors(data) : {};
         const message =
             response.status === 419
                 ? 'Your session has expired. Please try again.'

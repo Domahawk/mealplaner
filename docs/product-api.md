@@ -2,7 +2,9 @@
 
 TASK-14 exposes the existing [Product model](products.md) through same-origin JSON
 endpoints. Laravel's existing `web` session guard is authoritative; no bearer tokens,
-Sanctum, frontend components, search or filtering were introduced.
+Sanctum, search or filtering were introduced. TASK-15 now consumes these endpoints
+from the integrated [Product UI](product-ui.md), using the same session/XSRF
+conventions; the API contract and schema are unchanged.
 
 ## Endpoints and responses
 

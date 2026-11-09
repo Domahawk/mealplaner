@@ -7,6 +7,7 @@ import AboutView from '../views/AboutView.vue';
 import NotFoundView from '../views/NotFoundView.vue';
 import AuthenticationView from '../views/AuthenticationView.vue';
 import AccountView from '../views/AccountView.vue';
+import ProductsView from '../views/ProductsView.vue';
 
 declare module 'vue-router' {
     interface RouteMeta {
@@ -36,6 +37,12 @@ export const routes: RouteRecordRaw[] = [
         name: 'account',
         component: AccountView,
         meta: { title: 'Your account | Mealplaner', requiresAuth: true },
+    },
+    {
+        path: '/products',
+        name: 'products',
+        component: ProductsView,
+        meta: { title: 'Products | Mealplaner', requiresAuth: true },
     },
     {
         path: '/:pathMatch(.*)*',
