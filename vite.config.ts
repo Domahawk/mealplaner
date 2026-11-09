@@ -118,7 +118,7 @@ export default defineConfig(({ mode }) => {
                     navigateFallback: '/build/offline.html',
                     navigateFallbackDenylist: [
                         /^\/api(?:\/|$)/,
-                        /^\/(?:up|build|storage|icons|sanctum|_ignition|_debugbar|horizon|telescope|livewire|account)(?:\/|$)/,
+                        /^\/(?:up|build|storage|icons|sanctum|_ignition|_debugbar|horizon|telescope|livewire|account|products)(?:\/|$)/,
                         /\.[^/]+$/,
                     ],
                     cleanupOutdatedCaches: true,

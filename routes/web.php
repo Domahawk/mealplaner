@@ -32,6 +32,7 @@ Route::apiResource('api/products', ProductController::class)
 Route::view('/login', 'app')->name('login');
 Route::view('/register', 'app')->name('register');
 Route::view('/account', 'app')->middleware(['auth', 'cache.headers:no_store;private'])->name('account');
+Route::view('/products', 'app')->middleware(['auth', 'cache.headers:no_store;private'])->name('products.page');
 
 // Serving the worker at the root gives it the correct scope on every Laravel host.
 Route::get('/sw.js', function () {
@@ -46,5 +47,5 @@ Route::get('/sw.js', function () {
 
 // Add backend routes above this route. Reserve framework and static namespaces.
 Route::view('/{path?}', 'app')
-    ->where('path', '(?!(?:api|up|account|build|storage|icons|sanctum|_ignition|_debugbar|horizon|telescope|livewire)(?:/|$))(?!.*\.[^/]+$).*')
+    ->where('path', '(?!(?:api|up|account|products|build|storage|icons|sanctum|_ignition|_debugbar|horizon|telescope|livewire)(?:/|$))(?!.*\.[^/]+$).*')
     ->name('spa');

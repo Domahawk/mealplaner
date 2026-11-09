@@ -148,6 +148,15 @@ file-session browser helper to exercise Product CRUD through actual login cookie
 fresh guards, encrypted XSRF headers and logout invalidation. Production auth/CSRF
 middleware is retained; no test-only production route or new framework is introduced.
 
+TASK-15 adds `tests/frontend/products.test.ts` with real application/router/Pinia
+mounts and controlled HTTP responses: product rendering, authenticated navigation,
+create/edit/delete payloads, client/server validation, exact decimal strings, optional
+fields, duplicate prevention, accessible dialog cancellation, pagination edge cases,
+load/deletion failures and session/CSRF recovery. Existing auth tests also exercise
+the shared request transport. The dialog shim covers JSDOM's missing methods only;
+Chrome separately verifies native focus/Escape/background inertness. Backend tests
+cover the protected `/products` HTML entry and its reserved fallback namespace.
+
 ## Coverage and reports
 
 The PHP development image includes pinned **Xdebug 3.5.3**, with `xdebug.mode=off`

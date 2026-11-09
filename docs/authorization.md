@@ -9,6 +9,12 @@ auto-discovered ProductPolicy; see [products.md](products.md). TASK-14 now appli
 these conventions to [Product CRUD](product-api.md), using owner-scoped ID binding,
 relationship queries, Form Requests and explicit Gate checks on every operation.
 
+TASK-15 adds an authenticated `/products` HTML entry and Vue route. Laravel redirects
+guest HTML requests to login and returns JSON 401 for JSON requests. Unknown private
+subpaths return 404, and Workbox excludes `/products` from offline navigation fallback.
+Vue clears product state on session/account changes and keeps all data operations
+behind the existing server-side Product API checks. See [product-ui.md](product-ui.md).
+
 ## Current access-control audit
 
 The authenticated `/api/products` resource routes now inherit web/session/CSRF

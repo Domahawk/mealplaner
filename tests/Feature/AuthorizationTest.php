@@ -28,6 +28,17 @@ class AuthorizationTest extends TestCase
             ->assertJsonPath('message', 'Unauthenticated.');
     }
 
+    public function test_products_page_requires_authentication_and_private_paths_never_use_the_spa_fallback(): void
+    {
+        $this->get('/products')->assertRedirect('/login');
+        $this->getJson('/products')->assertUnauthorized();
+        $this->get('/products/missing')->assertNotFound()->assertDontSee('<div id="app"></div>', false);
+        $this->actingAs(User::factory()->create());
+        $this->get('/products')->assertOk()->assertSee('<div id="app"></div>', false)
+            ->assertHeader('Cache-Control', 'no-store, private');
+        $this->get('/products/missing')->assertNotFound();
+    }
+
     #[DataProvider('publicRoutes')]
     public function test_public_routes_remain_accessible_to_guests(string $path): void
     {

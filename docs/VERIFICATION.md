@@ -1,5 +1,127 @@
 # Verification record
 
+## TASK-15 — Product management UI (2026-11-06)
+
+Created `feature/task-15-product-ui` from clean local `main` at `53c4893` before
+editing. The root Laravel/Vue architecture, Product API, models, Policy, schema,
+lockfiles and dependencies are preserved. [Product UI](product-ui.md) documents
+behavior and prerequisites.
+
+### Implementation and changed files
+
+The authenticated Products navigation/page displays product cards with exact API
+decimal strings, kcal/macronutrient units per 100 g, brand and optional package weight.
+An inline form creates/edits products with client feedback and Laravel field errors.
+A styled native HTML dialog names the deletion target, focuses cancellation and
+requires confirmation; Escape cancels when idle. Pending saves/deletions cannot be
+submitted twice. Loading, empty, success, retryable failure and session-expiry states
+are visible and accessible. Creation opens the last page; edits refresh in place;
+deleting the final record on a page returns to the last available page.
+
+Typed Product API functions reuse the extracted same-origin JSON transport from
+`lib/api.ts`, retaining cookies, XSRF headers, no-store and the existing timeout.
+Authentication retains its response/error contract. Page-local state avoids an
+unnecessary store, ignores stale requests after navigation/account changes and
+never stores products in browser storage. Session refresh after 419 never replays
+mutations; success remains explicit if a subsequent list refresh fails.
+
+Laravel protects the new `/products` entry with `auth`/private-no-store and reserves
+unknown subpaths from the SPA fallback. Workbox excludes `/products` from offline
+fallback, matching `/account` and `/api`. No Product API or schema change was needed.
+
+Created:
+
+- `resources/js/views/ProductsView.vue`
+- `resources/js/components/{ProductForm,DeleteProductDialog}.vue`
+- `resources/js/lib/products.ts`
+- `tests/frontend/products.test.ts`
+- `docs/product-ui.md`
+
+Modified: `resources/css/app.css`, `resources/js/{App.vue,lib/api.ts,router/index.ts,
+views/AccountView.vue}`, `routes/web.php`, `vite.config.ts`,
+`tests/Feature/AuthorizationTest.php`, `tests/e2e/application.spec.ts`, `README.md`,
+`docs/{architecture,authorization,products,product-api,testing,VERIFICATION}.md`.
+
+### Executed checks
+
+All language/tool checks use the existing Docker services and mapped users:
+`docker compose exec -T --user app backend` for PHP,
+`docker compose exec -T --user node frontend` for npm. Locked dependencies were not
+installed or changed. Both mandatory quality gates were executed.
+
+| Command/check                            | Result                                                                                                                                                             |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `composer quality`                       | Passed: Pint 57 files and PHPStan/Larastan level 8, no errors.                                                                                                     |
+| `composer test:coverage`                 | Passed: 224 tests / 4,267 assertions, no skips; 99.40% app/routes line coverage (166/167). Generated PostgreSQL database and restricted role removed.              |
+| `composer test:sqlite`                   | Passed: 186 tests / 2,268 assertions, memory-only tests.                                                                                                           |
+| `npm run quality`                        | Passed: zero-warning ESLint, Prettier and strict Vue TSC.                                                                                                          |
+| `npm run test:unit`                      | Passed: 50 tests across four files, including 18 new Product UI cases and all existing auth/connectivity/theme tests.                                              |
+| `npm run test:coverage`                  | Passed: 50 tests, 93.60% frontend line coverage, HTML/LCOV/summary generated with unchanged coverage scope.                                                        |
+| `npm run build` / `npm run verify:build` | Passed: 57 modules, integrated production Vite/PWA assets and artifact checks.                                                                                     |
+| Production Playwright application suite  | Passed: 2 tests; 1 development-only test skipped. Includes offline denial of `/products` and `/account`, public SPA routing, same-origin readiness and PWA assets. |
+| `php artisan migrate:status`             | Read-only: users/cache applied; existing products migration pending. No development migration ran.                                                                 |
+
+New component tests use real App/router/Pinia instances with controlled fetch responses.
+They verify rendering, route guarding, client and Laravel validation, preserved inputs,
+optional-field clearing, exact request payloads/CSRF, duplicate prevention, native-dialog
+cancellation, confirmed deletion, safe errors, pagination including an emptied final
+page, 401/419 handling, malformed responses and success followed by refresh failure.
+JSDOM's missing dialog methods are shimmed only in the test file; no production
+fallback or browser-confirm usage was added. Laravel tests verify the private HTML
+entry, JSON guest denial and unknown private subpaths.
+
+### Actual browser and HTTP verification
+
+Chrome used the already-installed Playwright 1.64.1 tooling copied in the earlier
+verification workspace; no package or browser download was needed. A temporary
+PHP development server served the built production assets using a generated,
+restricted PostgreSQL database, synthetic application key and private temporary file
+sessions. The existing guarded provisioning/cleanup mechanism was reused; its child
+verified testing mode, actual database/role identity and restricted permissions before
+applying ordinary existing migrations. Development configuration and data were never
+used for these writes. Temporary server/session/public-symlink resources were cleaned
+up, and the parent removed only its generated database/login after each run.
+
+The real browser flow passed:
+
+- Guest route protection; registration/session/XSRF through existing Vue forms.
+- Empty state and client validation; create/edit using real Product API responses.
+- No document reload for creation; authenticated product visibility after an explicit
+  reload; correct optional-package clearing and fixed-scale kcal/macronutrient display.
+- Real API pagination across 21 owned products; confirmed deletion and list refresh.
+- Modal cancellation focus, Tab/Shift+Tab between actions, background controls unable
+  to receive focus, Escape dismissal and focus return to the originating delete action.
+- List and edit form at 1440, 390 and 320 px without horizontal overflow; light/dark
+  screenshots and the mobile confirmation dialog inspected. Nine screenshots remain
+  as temporary artifacts outside Git. The final pass used reduced motion for stable
+  captures and verified the existing theme control.
+- Logout invalidation and denial of a subsequent direct private navigation.
+
+An additional layout-only Chrome pass with synthetic session/list responses verified
+701, 720, 768, 820 and 960 px widths without horizontal overflow, using the normal
+Laravel/Vite origin and no development writes. The existing production Playwright
+application suite also passed (2 tests, 1 development-only skip), including the new
+offline `/products` exclusion. Its copied tooling lacked an npm binary shim; invoking
+the existing Playwright CLI JavaScript directly resolved that without installation.
+
+An initial keyboard probe incorrectly assumed native modal reverse-tab traversal
+could not reach browser chrome; it was corrected to test modal actions and background
+inertness, preserving native dialog behavior. The complete browser flow then passed.
+
+Read-only requests through the normal Nginx origin returned health/readiness JSON 200,
+`/products` guest redirect 302, `/products/missing` 404 and `/api/products` JSON 401.
+Health retained exact `{"status":"ok"}`. No authenticated browser record was created
+in the development database.
+
+### Limits and safety
+
+The existing development products migration remains pending; follow the reviewed
+migration workflow before using CRUD against it. No migration/model/API contract,
+development record, environment/key, database volume or dependency was changed.
+Search/filtering (TASK-16), recipes and tracking remain out of scope. HMR was not
+repeated; hosted CI was not executed for uncommitted changes. No commit, push, merge
+or PR creation occurred. Active branch: `feature/task-15-product-ui`.
+
 ## TASK-14 — Product CRUD API and authorization (2026-11-06)
 
 Created `feature/task-14-product-api` from clean local `main` at `1f16cc8` before

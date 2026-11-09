@@ -1,8 +1,8 @@
 # Product data model
 
 TASK-13 introduces the Product model, migration, factories and ownership Policy.
-TASK-14 now adds the [Product REST API](product-api.md); frontend screens remain
-future work. The migration has been
+TASK-14 adds the [Product REST API](product-api.md), and TASK-15 adds the
+[management interface](product-ui.md). The migration has been
 verified on isolated PostgreSQL databases; it has not been applied to development.
 
 ## Schema and units
