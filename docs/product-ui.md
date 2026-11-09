@@ -25,7 +25,7 @@ API endpoint or database schema was introduced.
   and restores focus on cancellation. Closing is blocked while deletion is in progress.
 - Previous/Next controls expose the current page, page count and owned-product total.
   Boundary controls and controls that could conflict with an open form or pending
-  operation are disabled. Search and filtering remain TASK-16 work.
+  operation are disabled. TASK-16 adds the search/range controls described below.
 
 Loading, empty, success and error states are visible. Forms prevent duplicate saves,
 and deletion cannot be submitted twice while pending. Laravel 422 errors appear
@@ -34,6 +34,40 @@ summary receives focus. Inputs remain available for correction after a failed sa
 Notifications use status/alert regions, with no browser alert/confirm/prompt calls.
 Mobile layouts stack the form and cards; desktop uses two columns. Existing light,
 dark, focus and reduced-motion conventions are reused.
+
+## Search, nutrition filters and bookmarks
+
+The search field matches a literal phrase in product name or brand, regardless of
+case. Open **Nutrition filters · per 100 g** to set optional minimum/maximum kcal,
+protein, carbohydrate and fat bounds. Bounds are inclusive and accept at most two
+decimal places; leave either side blank for no limit. Zero is preserved. Laravel
+returns invalid-range/type/precision errors beside the relevant bound; an active
+filter automatically opens the nutrition panel on a bookmarked page.
+
+Typing is debounced for 300 ms. Changing search or bounds resets pagination to page
+1; Previous/Next retains all applied criteria. **Clear search and filters** removes
+them and returns to page 1. Empty matches are distinguished from a new empty product
+collection. Loading clears old cards immediately when input changes; late results
+and errors cannot overwrite the latest query. Search/ranges remain editable during
+loading, and are disabled during edits, dialogs or mutations to avoid conflicts.
+
+Recognized API parameter names are also used on `/products`: `search`,
+`calories_min/max`, `protein_min/max`, `carbohydrates_min/max`, `fat_min/max`
+(where each min/max notation represents two separate parameters), plus `page`.
+For example `/products?search=oats&protein_min=10&fat_max=5&page=2` can be shared
+or bookmarked. Refresh and browser Back/Forward restore controls and results from
+the URL. Search changes replace history after debouncing; pagination creates history
+entries. Typed spaces are retained so pausing between words does not join them;
+API requests normalize surrounding whitespace. Products stay in page-local memory,
+not browser storage; URL parameters contain only criteria and page state.
+
+`useProductSearch.ts` coordinates URL updates/debouncing and guards against an older
+navigation finishing after newer typing while the existing session guard is pending.
+Product CRUD retains the active criteria: edits/deletions refresh matching results
+and clamp empty pages, and creation explains that a new product may be hidden by
+current filters. The [API contract](product-api.md) documents validated bounds and
+matching behavior. No autocomplete, external food database or client-side search
+index is used.
 
 ## Integration and boundaries
 
@@ -65,7 +99,9 @@ and `/account`. Vue's guard supplements Laravel/API ownership enforcement.
 `tests/frontend/products.test.ts` mounts the real application/router/Pinia with
 controlled HTTP responses to verify rendering, navigation, field validation, Laravel
 errors, exact payloads, CSRF headers, CRUD actions, pagination, duplicate prevention,
-dialog cancellation, failures and expired-session behavior. The JSDOM dialog method
+dialog cancellation, failures and expired-session behavior. TASK-16 adds search,
+bound validation, filtered pagination, debouncing, bookmark/history restoration and
+stale response/navigation regressions. The JSDOM dialog method
 shim is test-only; actual modal focus, Escape and background inertness were verified
 in Chrome. Existing authentication and connectivity tests remain in the full suite.
 Backend authorization tests cover the new private HTML route and fallback boundary.
@@ -80,8 +116,9 @@ docker compose exec -T --user app backend composer quality
 docker compose exec -T --user app backend composer test
 ```
 
-The existing development products migration remains pending. Follow the reviewed
-[database migration workflow](database.md) before using CRUD against that database.
+Read-only TASK-16 inspection confirms the existing products migration is now applied
+in development; no migration was run in TASK-16. Continue to use the reviewed
+[database migration workflow](database.md) for any future schema changes.
 TASK-15 browser verification used a generated restricted PostgreSQL database, existing
 migrations and temporary file sessions, then removed only its own test resources.
 No development records or schema were changed. See [VERIFICATION.md](VERIFICATION.md)

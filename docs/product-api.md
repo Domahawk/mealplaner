@@ -2,7 +2,7 @@
 
 TASK-14 exposes the existing [Product model](products.md) through same-origin JSON
 endpoints. Laravel's existing `web` session guard is authoritative; no bearer tokens,
-Sanctum, search or filtering were introduced. TASK-15 now consumes these endpoints
+Sanctum or a second authentication system were introduced. TASK-15 now consumes these endpoints
 from the integrated [Product UI](product-ui.md), using the same session/XSRF
 conventions; the API contract and schema are unchanged.
 
@@ -70,8 +70,45 @@ Lists use ascending primary-key order, independent of duplicate names or timesta
 `per_page` defaults to 20 and accepts 1 through 100. Pagination links retain the
 validated page size. Totals, data and page counts include only the current owner's
 products. An out-of-range page returns an empty `data` array with the owner's totals.
-Example: `/api/products?page=2&per_page=20`. Sorting overrides, search and filtering
-are not implemented.
+Example: `/api/products?page=2&per_page=20`. TASK-16 adds the search and range
+parameters below; sorting overrides remain unsupported.
+
+## Search and nutritional ranges
+
+`GET /api/products` accepts optional `search` (at most 255 characters, no null bytes).
+It performs case-insensitive literal substring matching across name **or** brand.
+The entire trimmed search phrase is matched; `%`, `_`, `!` and backslash are literal
+characters, not client-supplied wildcards or regular expressions. Empty search is
+unrestricted. No separate search endpoint is introduced.
+
+| Nutrient per 100 g | Minimum parameter   | Maximum parameter   | Accepted bounds |
+| ------------------ | ------------------- | ------------------- | --------------- |
+| Calories (kcal)    | `calories_min`      | `calories_max`      | 0–999,999.99    |
+| Protein (g)        | `protein_min`       | `protein_max`       | 0–100           |
+| Carbohydrates (g)  | `carbohydrates_min` | `carbohydrates_max` | 0–100           |
+| Fat (g)            | `fat_min`           | `fat_max`           | 0–100           |
+
+Bounds are inclusive, independently optional and limited to two decimal places.
+Empty/null bounds are ignored; zero is a real bound. When both are supplied, the
+maximum must be at least the minimum; invalid ranges return HTTP 422 with the
+maximum field highlighted. Invalid arrays, negative, over-capacity, non-finite and
+scientific-notation values are rejected using the existing Form Request.
+
+Search and every supplied range combine with AND, within the authenticated owner
+relationship. Name/brand OR conditions are grouped so they cannot escape ownership.
+The database lowers both the text and parameter using its locale rules; matching
+is case-insensitive, without accent folding or fuzzy/full-text search. Literal
+pattern escaping and SQL bound parameters prevent wildcard expansion and injection.
+All filters run before counting/pagination; ordering remains ascending ID. Links
+preserve validated criteria and page size, excluding unknown client parameters.
+
+Example: `/api/products?search=oats&protein_min=10&fat_max=5&page=2&per_page=20`.
+Resource fields, auth/CSRF behavior and CRUD routes are unchanged. The UI bookmarks
+these criteria on `/products`; see [product-ui.md](product-ui.md).
+
+The existing owner index narrows the query. Substring matching may scan that owner’s
+products; no speculative trigram/full-text extension, index or schema change was
+added. Profile representative workloads before introducing search infrastructure.
 
 ## Authentication and ownership
 
@@ -112,9 +149,9 @@ Run the canonical suite with:
 docker compose exec -T --user app backend composer test
 ```
 
-The read-only TASK-14 development status check still shows the existing products
-migration pending. It must be applied through the reviewed [migration workflow](database.md)
-before using authenticated CRUD against that development database. No development
+The TASK-14 development status check showed the existing products migration pending.
+Read-only TASK-16 inspection now confirms it is applied; TASK-16 ran no development
+migration. Use the reviewed [migration workflow](database.md) for future schema changes. No development
 migration, reset, record write or schema change was performed in TASK-14. The isolated
 PostgreSQL runner applies existing migrations to its new test database and verifies
 the complete API there. No new migration or dependency is required by this task.

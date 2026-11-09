@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import ProductForm from '../components/ProductForm.vue';
 import DeleteProductDialog from '../components/DeleteProductDialog.vue';
+import ProductFilters from '../components/ProductFilters.vue';
+import { useProductSearch } from '../composables/useProductSearch';
 import { ApiError } from '../lib/api';
 import {
     deleteProduct,
@@ -30,11 +32,16 @@ const formMessage = ref('');
 const deleting = ref<Product | null>(null);
 const deleteError = ref('');
 const heading = ref<HTMLElement>();
+const filterErrors = ref<Record<string, string[]>>({});
 let active = true;
 let requestNumber = 0;
 
-onMounted(() => {
-    void loadPage();
+const search = useProductSearch(loadPage, () => {
+    requestNumber++;
+    products.value = [];
+    loading.value = true;
+    loadError.value = '';
+    filterErrors.value = {};
 });
 onBeforeUnmount(() => {
     active = false;
@@ -78,16 +85,20 @@ async function loadPage(target = page.value): Promise<boolean> {
     loadError.value = '';
     products.value = [];
     try {
-        const result = await listProducts(target);
+        const result = await listProducts(target, search.applied.value);
         if (!active || sequence !== requestNumber) return false;
-        if (target > result.lastPage) return await loadPage(result.lastPage);
+        if (target > result.lastPage) return await search.setPage(result.lastPage, true);
         products.value = result.products;
         page.value = result.page;
         lastPage.value = result.lastPage;
         total.value = result.total;
+        filterErrors.value = {};
         return true;
     } catch (error: unknown) {
-        if (active && sequence === requestNumber) loadError.value = await errorMessage(error);
+        if (active && sequence === requestNumber) {
+            filterErrors.value = error instanceof ApiError ? error.errors : {};
+            loadError.value = await errorMessage(error);
+        }
         return false;
     } finally {
         if (sequence === requestNumber) loading.value = false;
@@ -120,9 +131,11 @@ async function submit(input: ProductInput): Promise<void> {
         if (!active) return;
         await closeForm();
         success.value = creating ? 'Product created.' : 'Product updated.';
-        const refreshed = await loadPage(creating ? 1 : page.value);
+        const refreshed = await search.setPage(creating ? 1 : page.value, true);
         // New products sort last; open their page after getting current metadata.
-        if (creating && refreshed && lastPage.value > 1) await loadPage(lastPage.value);
+        if (creating && refreshed && lastPage.value > 1) await search.setPage(lastPage.value, true);
+        if (creating && search.active.value)
+            success.value += ' Active filters may hide the new product.';
     } catch (error: unknown) {
         if (!active) return;
         formErrors.value = error instanceof ApiError ? error.errors : {};
@@ -175,6 +188,12 @@ function openDelete(product: Product): void {
             </button>
         </div>
         <p v-if="success" class="notice" role="status">{{ success }}</p>
+        <ProductFilters
+            v-model="search.draft.value"
+            :errors="filterErrors"
+            :disabled="pending || formOpen || Boolean(deleting)"
+            @clear="search.clear"
+        />
         <ProductForm
             v-if="formOpen"
             :key="editing?.id ?? 'new'"
@@ -199,7 +218,11 @@ function openDelete(product: Product): void {
                 </button>
             </div>
             <p v-else-if="!products.length" class="empty-products">
-                No products yet. Add your first food product to get started.
+                {{
+                    search.active.value
+                        ? 'No products match your search and filters. Try changing or clearing them.'
+                        : 'No products yet. Add your first food product to get started.'
+                }}
             </p>
             <ul v-else class="product-list" aria-label="Your products">
                 <li v-for="product in products" :key="product.id" class="product-card">
@@ -259,7 +282,7 @@ function openDelete(product: Product): void {
                 type="button"
                 class="secondary-button"
                 :disabled="page <= 1 || loading || pending || formOpen"
-                @click="loadPage(page - 1)"
+                @click="search.setPage(page - 1)"
             >
                 Previous
             </button>
@@ -268,7 +291,7 @@ function openDelete(product: Product): void {
                 type="button"
                 class="secondary-button"
                 :disabled="page >= lastPage || loading || pending || formOpen"
-                @click="loadPage(page + 1)"
+                @click="search.setPage(page + 1)"
             >
                 Next
             </button>
