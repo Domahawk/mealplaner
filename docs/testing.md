@@ -167,6 +167,15 @@ search regressions. Fake timers apply only to debounce cases and are restored af
 each test. Canonical PostgreSQL remains authoritative; optional SQLite exercises the
 same parameterized substring query for ASCII cases without changing test isolation.
 
+TASK-18 adds `tests/Feature/RecipeTest.php` and `tests/Postgres/RecipeTest.php`.
+They use existing factories and guarded database transactions to cover recipe and
+custom-pivot relations, required positive values, decimal precision, duplicate links,
+same-owner validation, raw composite-FK enforcement, parent ownership immutability,
+cascade/restrict behavior and Product DELETE 409/204 handling. The Product component
+suite verifies that conflict remains visible without removing the product. No recipe
+HTTP endpoints or calculation tests are claimed; TASK-19 must add its real request,
+Policy and referenced-resource HTTP regressions. See [recipes.md](recipes.md).
+
 ## Coverage and reports
 
 The PHP development image includes pinned **Xdebug 3.5.3**, with `xdebug.mode=off`

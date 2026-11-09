@@ -16,7 +16,8 @@ TASK-10 completes registration/login/logout within that starter. Mealplaner's
 **MVP v0.1.0** domain features are planned: user-owned nutritional products; recipes and
 quantity-based nutrition calculation; dated consumption records; and daily calorie,
 protein, carbohydrate, and fat totals. TASK-13 adds the Product persistence model
-and ownership Policy; TASK-14 adds authenticated Product CRUD endpoints. TASK-15 adds the integrated Product UI; recipe/food-log workflows remain unimplemented.
+and ownership Policy; TASK-14 adds authenticated Product CRUD endpoints. TASK-15 adds the integrated Product UI. TASK-18 adds Recipe/ingredient persistence;
+recipe HTTP/UI, calculations and food-log workflows remain unimplemented.
 
 ## Detected technology and versions
 
@@ -131,8 +132,9 @@ flowchart LR
   and running development service. Eloquent persists user accounts; the `SELECT 1`
   connectivity probe remains. The Product model/schema exists and is exercised in
   isolated PostgreSQL tests; read-only TASK-16 inspection confirms its development
-  migration is applied. Recipe and
-  consumption schemas remain future work.
+  migration is applied. TASK-18 defines recipes and ingredient associations with
+  composite ownership FKs; their migrations remain pending in development.
+  Consumption schema remains future work.
 
 ## Routing
 
@@ -236,6 +238,14 @@ management UI using those endpoints. Read-only TASK-16 inspection now confirms t
 existing products migration is applied in development; no migration ran in TASK-16. The canonical isolated
 PostgreSQL suite verifies precision and constraints; optional SQLite tests provide
 model smoke coverage. See [products.md](products.md) for the schema and rationale.
+
+TASK-18 adds Recipe and RecipeIngredient models/factories, positive servings, exact
+quantity grams and many-to-many Product references. Composite foreign keys enforce
+same-owner ingredients, recipe deletion cascades associations and referenced product
+deletion is restricted. Product DELETE translates that conflict to 409; the existing
+Product dialog explains it. RecipePolicy/model guards form the foundation for
+TASK-19 HTTP enforcement. No recipe endpoints, calculations or redundant nutrition
+totals exist. New migrations remain pending in development. See [recipes.md](recipes.md).
 
 Root `.env.example` currently documents local PostgreSQL, file sessions/cache,
 synchronous queues, log mail, application naming, and Vite/Compose settings. Real local
@@ -384,7 +394,8 @@ Development Compose configuration is not the production deployment contract.
    ownership is documented by TASK-11, and TASK-13 adds the Product schema and Policy.
    TASK-14 implements Product CRUD; CI and local browser verification are recorded
    separately. Remaining recipe/log APIs,
-   recipe/log schema, nutrition calculations and production deployment are future work. `docs/NEW_PROJECT.md` is template-reuse reference, not
+   food-log schema, nutrition calculations and production deployment are future work;
+   TASK-18 defines recipe/ingredient persistence. `docs/NEW_PROJECT.md` is template-reuse reference, not
    an instruction to initialize another project inside Mealplaner.
 
 7. **Review locked development-tool advisories in scoped maintenance.** TASK-03

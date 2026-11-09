@@ -669,4 +669,21 @@ describe('Product management', () => {
         await flushPromises();
         expect(router.currentRoute.value.query.search).toBe('Rolled Oats');
     });
+    it('explains a recipe reference conflict without deleting or hiding the product', async () => {
+        failure = {
+            method: 'DELETE',
+            status: 409,
+            body: { message: 'This product is used in a recipe.' },
+        };
+        const { wrapper } = await mountApp();
+        await wrapper.get('button[aria-label="Delete Oats"]').trigger('click');
+        await button(wrapper, 'Delete product').trigger('click');
+        await flushPromises();
+        expect(wrapper.get('dialog').text()).toContain(
+            'Remove it from recipes before deleting it.',
+        );
+        expect(products).toHaveLength(1);
+        await button(wrapper, 'Keep product').trigger('click');
+        expect(wrapper.get('.product-list').text()).toContain('Oats');
+    });
 });

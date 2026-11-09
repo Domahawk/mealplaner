@@ -7,8 +7,10 @@ use App\Http\Requests\ProductRequest;
 use App\Http\Resources\ProductResource;
 use App\Models\Product;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 
 class ProductController extends Controller
@@ -67,7 +69,20 @@ class ProductController extends Controller
     public function destroy(Product $product): Response
     {
         Gate::authorize('delete', $product);
-        $product->delete();
+        try {
+            // The FK is authoritative, including an attachment racing with deletion.
+            DB::transaction(fn () => $product->delete());
+        } catch (QueryException $exception) {
+            $recipeConstraint = in_array($exception->errorInfo[0] ?? null, ['23001', '23503'], true)
+                && str_contains((string) ($exception->errorInfo[2] ?? ''), 'recipe_product_product_owner_foreign');
+            // SQLite reports no constraint name; retain optional in-memory test support.
+            $sqliteRecipeConstraint = DB::getDriverName() === 'sqlite'
+                && ($exception->errorInfo[0] ?? null) === '23000' && $product->recipes()->exists();
+            if (! $recipeConstraint && ! $sqliteRecipeConstraint) {
+                throw $exception;
+            }
+            abort(409, 'This product is used in a recipe. Remove it from recipes before deleting it.');
+        }
 
         return response()->noContent()->header('Cache-Control', 'no-store, private');
     }

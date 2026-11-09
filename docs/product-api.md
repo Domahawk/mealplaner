@@ -135,6 +135,15 @@ an unsafe request with invalid CSRF credentials may be rejected first with HTTP 
 preserving that middleware behavior is intentional. Native session locking can
 return 423 if a concurrent session request exceeds its lock wait.
 
+## Referenced-product deletion
+
+TASK-18 adds recipe ingredient foreign keys. Deleting a referenced product returns
+HTTP 409 with `message`: "This product is used in a recipe. Remove it from recipes
+before deleting it." Products/ingredients remain intact. The existing dialog shows
+that message. Missing/foreign IDs retain 404, guests retain 401, and unreferenced
+products still delete with 204. Database restrictions close attachment/deletion races;
+only the known recipe-reference failure is translated. See [recipes.md](recipes.md).
+
 ## Verification and local prerequisites
 
 `tests/Feature/ProductApiTest.php` covers CRUD, resources, pagination, authentication,

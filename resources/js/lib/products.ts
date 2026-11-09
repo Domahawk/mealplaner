@@ -84,15 +84,17 @@ async function request(
                 ? 'Please log in to manage your products.'
                 : response.status === 419
                   ? 'Your session changed. Review your changes and try again.'
-                  : response.status === 422
-                    ? 'Please check the highlighted fields.'
-                    : response.status === 403
-                      ? 'You do not have permission to change this product.'
-                      : response.status === 404
-                        ? 'This product is no longer available. Refresh your products.'
-                        : response.status === 423
-                          ? 'Another request is still running. Please try again shortly.'
-                          : 'Unable to complete the request. Please try again.';
+                  : response.status === 409
+                    ? 'This product is used in a recipe. Remove it from recipes before deleting it.'
+                    : response.status === 422
+                      ? 'Please check the highlighted fields.'
+                      : response.status === 403
+                        ? 'You do not have permission to change this product.'
+                        : response.status === 404
+                          ? 'This product is no longer available. Refresh your products.'
+                          : response.status === 423
+                            ? 'Another request is still running. Please try again shortly.'
+                            : 'Unable to complete the request. Please try again.';
         throw new ApiError(
             message,
             response.status,

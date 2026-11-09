@@ -54,10 +54,17 @@ accounts and independent cookies to verify that forged query/body/header identif
 cannot select another identity, overwrite another registration, or log out another
 session. No redundant UserPolicy is needed for a resource lookup that does not exist.
 
+TASK-18 [recipe ownership](recipes.md) derives ingredient owners and checks referenced
+products during model saves. Two composite foreign keys enforce that both parents
+share that owner, even for raw writes. Policies still require explicit authorization,
+queries still require user scoping, and batch writes require transactions. No recipe
+HTTP surface is implemented or claimed verified before TASK-19.
+
 ## Required conventions for future features
 
-The Product model, owner relationship and Policy exist as of TASK-13. Recipes and
-food logs remain future work. Product CRUD applies these patterns as of TASK-14;
+Product ownership and Policy exist as of TASK-13. TASK-18 adds RecipePolicy,
+recipe/ingredient model guards and composite database ownership constraints; recipe
+HTTP enforcement belongs to TASK-19. Food logs remain future work. Product CRUD applies these patterns as of TASK-14;
 model relationships and Policies alone do not secure an HTTP endpoint.
 
 1. **Authenticate at the server boundary.** Apply native `auth` to every private
@@ -76,8 +83,8 @@ model relationships and Policies alone do not secure an HTTP endpoint.
    they cannot escape the owner predicate. Apply the same rules in queued jobs and
    services, passing explicit owner context rather than depending on HTTP globals.
 4. **Authorize actions with the real model's Policy.** Use the existing `app/Policies/ProductPolicy.php`
-   and Laravel's standard model/policy discovery. Add equivalent Policies for Recipe
-   and FoodLog when introduced. Use non-nullable
+   and Laravel's standard model/policy discovery. TASK-18 also defines RecipePolicy;
+   invoke it on recipe HTTP actions in TASK-19. Add a FoodLog Policy when introduced. Use non-nullable
    `User` parameters for private abilities, and cover the applicable `viewAny`,
    `view`, `create`, `update`, and `delete` actions. Invoke `Gate::authorize`, native
    `can` middleware or a Form Request authorization check; defining a policy alone
